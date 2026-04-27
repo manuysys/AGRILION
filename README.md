@@ -10,12 +10,12 @@ condiciones de riesgo antes de que ocurran pérdidas económicas.
 
 ## 🚀 Características principales
 
--   Comunicación LoRa de largo alcance\
--   Batería de larga duración (6--12 meses)\
--   Sensores de temperatura, humedad y gases\
--   Envío de datos cada 1--2 horas\
--   Visualización web\
--   Sistema de alertas tempranas\
+-   Comunicación LoRa de largo alcance
+-   Batería de larga duración (6--12 meses)
+-   Sensores de temperatura, humedad y gases
+-   Envío de datos cada 1--2 horas
+-   Visualización web
+-   Sistema de alertas tempranas
 -   Preparado para integración con IA
 
 ------------------------------------------------------------------------
@@ -29,32 +29,32 @@ Dashboard
 
 ## ⚙️ Tecnologías
 
--   Hardware: CubeCell + sensores\
--   Comunicación: LoRa / MQTT\
--   Backend: Firebase\
--   Frontend: Flutter Web\
+-   Hardware: CubeCell + sensores
+-   Comunicación: LoRa / MQTT
+-   Backend: Firebase
+-   Frontend: Flutter Web
 -   Procesamiento: Python
 
 ------------------------------------------------------------------------
 
 ## ⚠️ Alertas
 
--   Humedad alta → posible filtración\
--   Temperatura elevada → actividad microbiana\
+-   Humedad alta → posible filtración
+-   Temperatura elevada → actividad microbiana
 -   CO₂ alto → deterioro del grano
 
-Estados: - Normal\
-- Advertencia\
+Estados: - Normal
+- Advertencia
 - Riesgo
 
 ------------------------------------------------------------------------
 
 ## 📊 Estado
 
--   Comunicación: OK\
--   Backend: OK\
--   Visualización: Básica\
--   Alertas: En desarrollo\
+-   Comunicación: OK
+-   Backend: OK
+-   Visualización: Básica
+-   Alertas: En desarrollo
 -   IA: En desarrollo
 
 ------------------------------------------------------------------------
@@ -68,5 +68,5 @@ tempranas.
 
 ## 👨‍💻 Autor
 
-Juan Manuel Iglesias\
+Juan Manuel Iglesias
 Proyecto Agrilion --- 2026
