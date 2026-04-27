@@ -1,0 +1,4 @@
+/venv
+.env
+influxd.exe
+serviceAccountKey.json
