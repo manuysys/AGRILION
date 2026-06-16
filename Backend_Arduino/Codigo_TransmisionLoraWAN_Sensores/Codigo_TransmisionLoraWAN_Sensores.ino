@@ -63,7 +63,7 @@ void configurarADXL345()
   Wire.endTransmission();
 
   Wire.beginTransmission(0x53);
-  Wire.write(0x2E); Wire.write(0x10); // INT_ENABLE → Activity
+  Wire.write(0x2E); Wire.write(0x01); // INT_ENABLE → Activity (bit 0, no DATA_READY)
   Wire.endTransmission();
 
   Wire.beginTransmission(0x53);
@@ -103,39 +103,27 @@ void ISR_Movimiento()
 // ================== PAYLOAD ==================
 void prepareTxFrame(uint8_t port)
 {
-  // 1. REANIMAR EL BUS I2C POR SI EL MODO SLEEP LO "DURMIÓ"
-  Wire.end();
-  delay(10);
-  Wire.begin();
   Wire.setClock(50000);
-  delay(100);
 
   float temp = sht30.readTemperature();
   float hum  = sht30.readHumidity();
   float pres = bme.readPressure() / 100.0F;
 
-  // 2. RE-INICIALIZAR EL SCD41 DE FORMA ROBUSTA
   uint16_t co2 = 0;
+  scd41.measureSingleShot();
   
-  if(scd41.begin(Wire)) { 
-      scd41.measureSingleShot();
-      
-      bool medicionLista = false;
-      for (int i = 0; i < 13; i++) {
-        delay(500);
-        if (scd41.readMeasurement()) {
-          co2 = scd41.getCO2();
-          medicionLista = true;
-          Serial.printf("SCD41 OK tras %d ms: CO2=%d ppm\n", (i + 1) * 500, co2);
-          break;
-        }
-      }
-      
-      if (!medicionLista) {
-        Serial.println("WARNING: SCD41 no logró devolver datos en 6.5s");
-      }
-  } else {
-      Serial.println("WARNING: SCD41 no respondió al begin() antes de medir");
+  bool medicionLista = false;
+  for (int i = 0; i < 13; i++) {
+    delay(500);
+    if (scd41.readMeasurement()) {
+      co2 = scd41.getCO2();
+      medicionLista = true;
+      break;
+    }
+  }
+  
+  if (!medicionLista) {
+    Serial.println("WARNING: SCD41 sin datos en 6.5s");
   }
 
   if (!impactoPendiente) {
@@ -143,9 +131,9 @@ void prepareTxFrame(uint8_t port)
     aceleracionGuardada = (uint16_t)(inst * 10);
   }
 
-  int t = isnan(temp) ? 0 : (int)(temp * 100);
-  int h = isnan(hum)  ? 0 : (int)(hum  * 100);
-  int p = isnan(pres) ? 0 : (int)pres;
+  int16_t t = isnan(temp) ? 0 : (int16_t)(temp * 100);
+  int16_t h = isnan(hum)  ? 0 : (int16_t)(hum  * 100);
+  int16_t p = isnan(pres) ? 0 : (int16_t)(pres * 10);  // conserva 1 decimal
 
   appDataSize = 11;
   appData[0]  = highByte(t);

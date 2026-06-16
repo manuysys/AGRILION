@@ -237,7 +237,7 @@ class FallbackLLMClient(BaseLLMClient):
         if self.rule_engine and context:
             logger.info("[Fallback] Using Rule Engine")
 
-            from rule_based_engine import RuleBasedEngine
+            from src.chatbot.rule_based_engine import RuleBasedEngine
 
             engine, state = RuleBasedEngine.from_context(context)
 
