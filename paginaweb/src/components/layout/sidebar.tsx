@@ -12,13 +12,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Bell,
+  LucideIcon
 } from 'lucide-react';
 import { useState } from 'react';
 
 interface NavItem {
   href: string;
   label: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   badge?: number;
 }
 
