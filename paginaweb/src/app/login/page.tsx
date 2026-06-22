@@ -1,158 +1,97 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Eye, EyeOff, LogIn } from "lucide-react";
-import Link from "next/link";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter } from 'next/navigation';
+import { Package, ArrowRight, Shield, Eye } from 'lucide-react';
 
 export default function LoginPage() {
-  const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    if (!email || !password) {
-      setError("Complete todos los campos");
-      return;
-    }
-
-    if (email === "demo@agrilion.com" && password === "demo2026") {
-      router.push("/dashboard");
-    } else {
-      setError("Credenciales incorrectas. Pruebe: demo@agrilion.com / demo2026");
-    }
+  const handleLogin = () => {
+    router.push('/dashboard');
   };
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-[#f0f7f3] via-white to-[#e8f0fe]">
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#1a5c3a] to-[#0f3d25] relative overflow-hidden items-center justify-center p-12">
-        <div className="absolute inset-0">
-          <div className="absolute top-20 left-20 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-20 right-20 w-80 h-80 bg-[#1e7fb0]/10 rounded-full blur-3xl" />
-        </div>
-
-        <div className="relative text-center max-w-md">
-          <Image
-            src="/icon.png"
-            alt="AGRILION"
-            width={64}
-            height={64}
-            className="mx-auto mb-6 rounded-2xl"
-          />
-          <h2 className="text-3xl font-bold text-white mb-4">
-            Monitoreo inteligente de silobolsas
-          </h2>
-          <p className="text-white/60 text-lg">
-            Acceda a su panel de control para visualizar el estado de sus
-            silobolsas en tiempo real.
-          </p>
-
-          <div className="mt-12 space-y-4">
-            {[
-              "Alertas en tiempo real",
-              "Gráficos de temperatura y humedad",
-              "Análisis predictivo con IA",
-            ].map((item, i) => (
-              <div key={i} className="flex items-center gap-3 text-white/70">
-                <span className="w-5 h-5 bg-white/10 rounded-full flex items-center justify-center">
-                  <span className="text-white text-xs">✓</span>
-                </span>
-                <span className="text-sm">{item}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--surface-dark)] via-[#0d2818] to-[#0a1a10] relative overflow-hidden">
+      {/* Background effects */}
+      <div className="absolute inset-0 opacity-10">
+        <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="login-grid" width="60" height="60" patternUnits="userSpaceOnUse">
+              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#login-grid)" />
+        </svg>
       </div>
+      <div className="absolute top-1/3 left-1/3 w-[500px] h-[500px] rounded-full bg-emerald-500/5 blur-[150px]" />
+      <div className="absolute bottom-1/3 right-1/3 w-[400px] h-[400px] rounded-full bg-teal-500/5 blur-[120px]" />
 
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6">
-        <div className="w-full max-w-sm">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-[#1a5c3a] mb-10 transition-colors"
-          >
-            ← Volver al inicio
-          </Link>
-
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Iniciar sesión
-            </h1>
-            <p className="text-sm text-gray-500">
-              Ingrese sus credenciales para acceder al dashboard.
-            </p>
+      <div className="relative w-full max-w-md mx-4">
+        {/* Card */}
+        <div className="glass-dark rounded-2xl p-8 sm:p-10 text-center">
+          {/* Logo */}
+          <div className="flex justify-center mb-6">
+            <div className="w-16 h-16 rounded-2xl bg-[var(--brand-primary)] flex items-center justify-center shadow-lg shadow-emerald-900/30">
+              <Package size={32} className="text-white" />
+            </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a5c3a]/20 focus:border-[#1a5c3a] transition-all"
-                placeholder="demo@agrilion.com"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Contraseña
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a5c3a]/20 focus:border-[#1a5c3a] transition-all pr-10"
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
-            {error && (
-              <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">
-                {error}
-              </p>
-            )}
-
-            <div className="flex items-center justify-end">
-              <button
-                type="button"
-                className="text-sm text-[#1e7fb0] hover:text-[#1a5c3a] transition-colors"
-              >
-                ¿Olvidó su contraseña?
-              </button>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#1a5c3a] text-white font-semibold rounded-xl hover:bg-[#2d8a4e] transition-all shadow-lg shadow-[#1a5c3a]/20 active:scale-[0.98]"
-            >
-              <LogIn size={18} />
-              Ingresar
-            </button>
-          </form>
-
-          <p className="mt-8 text-xs text-center text-gray-400">
-            Demo: demo@agrilion.com / demo2026
+          <h1 className="text-2xl font-bold text-white tracking-tight">
+            Agrilion<span className="text-emerald-400">+</span>
+          </h1>
+          <p className="text-sm text-white/50 mt-1 mb-8">
+            Monitoreo Inteligente de Silobolsas
           </p>
+
+          {/* Demo login */}
+          <button
+            onClick={handleLogin}
+            className="
+              w-full flex items-center justify-center gap-3
+              px-6 py-4 rounded-xl
+              text-base font-semibold text-white
+              bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-light)]
+              transition-all duration-200 cursor-pointer
+              shadow-lg shadow-emerald-900/30
+              group
+            "
+          >
+            <Shield size={20} />
+            Ingresar como Demo
+            <ArrowRight
+              size={18}
+              className="transition-transform duration-200 group-hover:translate-x-1"
+            />
+          </button>
+
+          <p className="text-xs text-white/30 mt-4">
+            Acceso directo al dashboard con datos de demostración
+          </p>
+
+          {/* Features preview */}
+          <div className="mt-8 pt-6 border-t border-white/10">
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { icon: Eye, label: 'Monitoreo' },
+                { icon: Shield, label: 'Alertas' },
+                { icon: Package, label: '6 Silos' },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.label} className="text-center">
+                    <Icon size={18} className="text-white/30 mx-auto mb-1" />
+                    <span className="text-[10px] text-white/40">{item.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
+
+        {/* Footer */}
+        <p className="text-xs text-white/20 text-center mt-6">
+          © 2026 Agrilion — Juan Manuel Iglesias
+        </p>
       </div>
     </div>
   );

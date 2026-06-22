@@ -16,11 +16,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AGRILION | Monitoreo Inteligente de Silobolsas",
+  title: "Agrilion+ | Monitoreo Inteligente de Silobolsas",
   description:
-    "Sistema de monitoreo inteligente para silobolsas con sensores IoT, comunicación LoRa y análisis con inteligencia artificial. Detecte riesgos antes de que generen pérdidas.",
-  keywords: ["silobolsas", "monitoreo", "IoT", "LoRa", "inteligencia artificial", "agricultura", "sensores", "agtech"],
+    "Sistema IoT para monitoreo en tiempo real de granos almacenados en silobolsas. Detectá deterioro antes de que ocurran pérdidas.",
+  keywords: [
+    "agrilion",
+    "silobolsa",
+    "monitoreo",
+    "IoT",
+    "granos",
+    "agricultura",
+    "sensores",
+    "alertas",
+  ],
 };
+
+import { SmoothScroll } from '@/components/ui/smooth-scroll';
 
 export default function RootLayout({
   children,
@@ -28,9 +39,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className={`${inter.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col font-sans">
-        {children}
+    <html lang="es" className={`${inter.variable} ${geistMono.variable}`}>
+      <body className="min-h-screen bg-surface-0 text-foreground antialiased">
+        <SmoothScroll>
+          {children}
+        </SmoothScroll>
       </body>
     </html>
   );

@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(NODE_EXTRA_CA_CERTS=0 npm install @splinetool/runtime @splinetool/react-spline usehooks-ts clsx tailwind-merge class-variance-authority)",
+      "Bash(NODE_TLS_REJECT_UNAUTHORIZED=0 npm install @splinetool/runtime @splinetool/react-spline usehooks-ts clsx tailwind-merge class-variance-authority)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"industrial IoT agricultural monitoring dashboard real-time\" --design-system -p \"Agrilion+\")",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"agriculture monitoring grain silo data\" --domain color -n 5)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"industrial control room telemetry dashboard saas\" --design-system -p \"Agrilion+\")",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"minimalism real-time charts sensor status alerts\" --domain style -n 5)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"touch target mobile accessibility outdoor sunlight\" --domain ux -n 5)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"industrial data dense dashboard\" --domain typography -n 5)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"trend timeline anomaly temperature\" --domain chart -n 5)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"industrial IoT monitoring agriculture silobolsa dashboard\" --design-system --persist -p \"Agrilion+\")",
+      "Bash(npm run *)",
+      "Bash(NODE_OPTIONS=--use-system-ca npm install usehooks-ts --no-audit --no-fund)",
+      "Bash(NODE_OPTIONS=--use-system-ca npm install @splinetool/runtime @splinetool/react-spline --no-audit --no-fund)",
+      "Bash(NODE_OPTIONS=--use-system-ca npm install clsx tailwind-merge --no-audit --no-fund)",
+      "Bash(curl -s -o /tmp/home.html -w \"Home: %{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(curl -s -o /tmp/login.html -w \"Login: %{http_code}\\\\n\" http://localhost:3000/login)",
+      "Bash(curl -s -o /tmp/dash.html -w \"Dashboard: %{http_code}\\\\n\" http://localhost:3000/dashboard)",
+      "Bash(curl -s -o /tmp/silo.html -w \"Silo SB-005: %{http_code}\\\\n\" http://localhost:3000/dashboard/silo/SB-005)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(rm -rf .next/dev)",
+      "Bash(curl -s -o /tmp/home.html -w \"Home: %{http_code} \\(%{size_download} bytes\\)\\\\n\" http://localhost:3000/)",
+      "Bash(curl -s -o /tmp/login.html -w \"Login: %{http_code} \\(%{size_download} bytes\\)\\\\n\" http://localhost:3000/login)",
+      "Bash(curl -s -o /tmp/dash.html -w \"Dashboard: %{http_code} \\(%{size_download} bytes\\)\\\\n\" http://localhost:3000/dashboard)",
+      "Bash(curl -s -o /tmp/silo.html -w \"Silo SB-005: %{http_code} \\(%{size_download} bytes\\)\\\\n\" http://localhost:3000/dashboard/silo/SB-005)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(curl *)"
+    ]
+  }
+}
