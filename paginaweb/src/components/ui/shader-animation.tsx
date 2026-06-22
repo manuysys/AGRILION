@@ -144,4 +144,3 @@ export function ShaderAnimation() {
     />
   )
 }
-export { ShaderAnimation }
