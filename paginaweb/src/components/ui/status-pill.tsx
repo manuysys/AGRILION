@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle, AlertTriangle, XCircle, WifiOff } from 'lucide-react';
+import { CheckCircle, AlertTriangle, XCircle, WifiOff, LucideIcon } from 'lucide-react';
 import type { HealthState } from '@/types';
 
 interface StatusPillProps {
@@ -15,7 +15,7 @@ const config: Record<HealthState, {
   bg: string;
   text: string;
   border: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
 }> = {
   ok: {
     label: 'Estable',

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertTriangle, AlertCircle, Info, CheckCircle, XCircle, ArrowRight, Eye } from 'lucide-react';
+import { AlertTriangle, AlertCircle, Info, CheckCircle, XCircle, ArrowRight, Eye, LucideIcon } from 'lucide-react';
 import type { Alert, AlertSeverity } from '@/types';
 import { formatRelativeTime } from '@/lib/formatters';
 
@@ -13,7 +13,7 @@ interface AlertCardProps {
 }
 
 const severityConfig: Record<AlertSeverity, {
-  icon: React.ElementType;
+  icon: LucideIcon;
   borderColor: string;
   bgColor: string;
   textColor: string;
