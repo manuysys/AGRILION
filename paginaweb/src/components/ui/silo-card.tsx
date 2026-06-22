@@ -62,40 +62,37 @@ export default function SiloCard({ silo, rank, className = '' }: SiloCardProps) 
           </div>
         </div>
 
-        {/* Right: metrics */}
-        <div className="flex items-center gap-6 shrink-0">
-          <div className="hidden sm:flex items-center gap-6">
-            <MetricCard
-              label="Temp"
-              value={formatTemp(silo.currentReading.temperature)}
-              current={silo.currentReading.temperature}
-              previous={silo.previousReading?.temperature}
-              icon="temperature"
-              state={getTemperatureState(silo.currentReading.temperature)}
-              compact
-            />
-            <MetricCard
-              label="Hum"
-              value={formatHumidity(silo.currentReading.humidity)}
-              current={silo.currentReading.humidity}
-              previous={silo.previousReading?.humidity}
-              icon="humidity"
-              state={getHumidityState(silo.currentReading.humidity)}
-              compact
-            />
-            <MetricCard
-              label="CO₂"
-              value={formatCO2(silo.currentReading.co2)}
-              current={silo.currentReading.co2}
-              previous={silo.previousReading?.co2}
-              icon="co2"
-              state={getCO2State(silo.currentReading.co2)}
-              compact
-            />
+        {/* Right: metrics with fluid progress bars */}
+        <div className="flex flex-col gap-3 shrink-0 sm:min-w-[300px]">
+          <div className="flex flex-col gap-1">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-zinc-500 uppercase tracking-widest font-bold">Temperatura</span>
+              <span className={`font-data font-bold ${getTemperatureState(silo.currentReading.temperature) === 'critical' ? 'text-red-500' : getTemperatureState(silo.currentReading.temperature) === 'warn' ? 'text-amber-500' : 'text-emerald-400'}`}>
+                {formatTemp(silo.currentReading.temperature)}
+              </span>
+            </div>
+            <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+              <div 
+                className={`h-full rounded-full transition-all duration-1000 ${getTemperatureState(silo.currentReading.temperature) === 'critical' ? 'bg-red-500 w-[95%]' : getTemperatureState(silo.currentReading.temperature) === 'warn' ? 'bg-amber-500 w-[70%]' : 'bg-emerald-500 w-[30%]'}`} 
+              />
+            </div>
           </div>
-
-          <ChevronRight size={24} className="text-zinc-600 shrink-0" />
+          <div className="flex flex-col gap-1">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-zinc-500 uppercase tracking-widest font-bold">Humedad</span>
+              <span className={`font-data font-bold ${getHumidityState(silo.currentReading.humidity) === 'critical' ? 'text-red-500' : getHumidityState(silo.currentReading.humidity) === 'warn' ? 'text-amber-500' : 'text-emerald-400'}`}>
+                {formatHumidity(silo.currentReading.humidity)}
+              </span>
+            </div>
+            <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+              <div 
+                className={`h-full rounded-full transition-all duration-1000 delay-100 ${getHumidityState(silo.currentReading.humidity) === 'critical' ? 'bg-red-500 w-[90%]' : getHumidityState(silo.currentReading.humidity) === 'warn' ? 'bg-amber-500 w-[65%]' : 'bg-emerald-500 w-[40%]'}`} 
+              />
+            </div>
+          </div>
         </div>
+
+        <ChevronRight size={24} className="text-zinc-600 shrink-0 self-center hidden sm:block ml-4" />
       </div>
 
       {/* Bottom row: mobile metrics + meta */}

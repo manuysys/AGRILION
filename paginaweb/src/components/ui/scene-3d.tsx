@@ -23,6 +23,20 @@ function CyberSilobag() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const [liveData, setLiveData] = useState({ hum: 18.2, co2: 1200, temp: 22.1 });
+
+  // Fluctuate data slightly every 2 seconds to simulate live sensors
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLiveData(prev => ({
+        hum: Number((prev.hum + (Math.random() * 0.4 - 0.2)).toFixed(1)),
+        co2: Math.floor(prev.co2 + (Math.random() * 10 - 5)),
+        temp: Number((prev.temp + (Math.random() * 0.2 - 0.1)).toFixed(1)),
+      }));
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
   useFrame((state, delta) => {
     if (meshRef.current && wireframeRef.current) {
       // Smooth interpolation for rotation based on scroll
@@ -54,23 +68,23 @@ function CyberSilobag() {
           metalness={0.8}
         />
         
-        {/* Apple-style floating UI labels that appear during scroll */}
-        <Html position={[0.6, 1.5, 0]} className="pointer-events-none transition-opacity duration-1000" style={{ opacity: scrollProgress > 0.15 && scrollProgress < 0.4 ? 1 : 0 }}>
+        {/* Apple-style floating UI labels that appear immediately */}
+        <Html position={[0.6, 1.5, 0]} className="pointer-events-none transition-opacity duration-1000" style={{ opacity: scrollProgress < 0.4 ? 1 : 0 }}>
           <div className="glass-dark px-4 py-2 rounded-xl border border-white/10 flex items-center gap-2 transform -translate-x-1/2">
             <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            <span className="text-white font-bold whitespace-nowrap text-sm">Humedad: 18%</span>
+            <span className="text-white font-bold whitespace-nowrap text-sm font-data">Humedad: {liveData.hum}%</span>
           </div>
         </Html>
-        <Html position={[-0.6, 0, 0]} className="pointer-events-none transition-opacity duration-1000" style={{ opacity: scrollProgress > 0.18 && scrollProgress < 0.4 ? 1 : 0 }}>
+        <Html position={[-0.6, 0, 0]} className="pointer-events-none transition-opacity duration-1000" style={{ opacity: scrollProgress < 0.4 ? 1 : 0 }}>
           <div className="glass-dark px-4 py-2 rounded-xl border border-white/10 flex items-center gap-2 transform translate-x-1/2">
             <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            <span className="text-white font-bold whitespace-nowrap text-sm">CO2: 1200ppm</span>
+            <span className="text-white font-bold whitespace-nowrap text-sm font-data">CO2: {liveData.co2}ppm</span>
           </div>
         </Html>
-        <Html position={[0.6, -1.5, 0]} className="pointer-events-none transition-opacity duration-1000" style={{ opacity: scrollProgress > 0.2 && scrollProgress < 0.4 ? 1 : 0 }}>
+        <Html position={[0.6, -1.5, 0]} className="pointer-events-none transition-opacity duration-1000" style={{ opacity: scrollProgress < 0.4 ? 1 : 0 }}>
           <div className="glass-dark px-4 py-2 rounded-xl border border-white/10 flex items-center gap-2 transform -translate-x-1/2">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-white font-bold whitespace-nowrap text-sm">Temp: 22°C</span>
+            <span className="text-white font-bold whitespace-nowrap text-sm font-data">Temp: {liveData.temp}°C</span>
           </div>
         </Html>
       </mesh>

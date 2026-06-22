@@ -94,13 +94,17 @@ export default function AlertCard({
   return (
     <div
       className={`
-        rounded-2xl border-r border-y border-white/5 glass-dark
-        border-l-4 ${cfg.borderColor}
-        transition-all duration-300 hover:bg-white/5 hover:shadow-2xl
+        relative rounded-2xl border-r border-y border-white/5 glass-dark overflow-hidden
+        border-l-[6px] ${cfg.borderColor}
+        transition-all duration-300 hover:bg-white/5 hover:-translate-y-1
         ${alert.acknowledged ? 'opacity-50' : ''}
+        ${alert.severity === 'critical' ? 'shadow-[0_0_30px_rgba(239,68,68,0.15)] border-y-red-500/20 border-r-red-500/20 animate-pulse' : ''}
         ${className}
       `}
     >
+      {alert.severity === 'critical' && (
+        <div className="absolute inset-0 bg-red-500/5 pointer-events-none" />
+      )}
       <div className="p-6">
         {/* Header */}
         <div className="flex items-start gap-4">
