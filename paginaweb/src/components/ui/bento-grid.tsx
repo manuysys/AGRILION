@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 export const BentoGrid = ({
   className,
@@ -33,11 +34,16 @@ export const BentoGridItem = ({
   icon?: React.ReactNode;
 }) => {
   return (
-    <div
+    <motion.div
       className={cn(
-        "row-span-1 rounded-3xl group/bento hover:shadow-xl transition duration-500 shadow-input dark:shadow-none p-6 glass-dark border border-white/5 bg-black/40 justify-between flex flex-col space-y-4",
+        "row-span-1 rounded-3xl group/bento hover:shadow-2xl hover:shadow-emerald-500/20 transition-shadow duration-500 p-6 glass-dark border border-white/5 bg-black/40 justify-between flex flex-col space-y-4 transform perspective-1000",
         className
       )}
+      whileHover={{ scale: 1.02, rotateY: 2, rotateX: 2 }}
+      animate={{ y: [0, -5, 0] }}
+      transition={{ 
+        y: { repeat: Infinity, duration: 4 + Math.random() * 2, ease: "easeInOut" }
+      }}
     >
       {header}
       <div className="group-hover/bento:translate-x-2 transition duration-200">
@@ -49,6 +55,6 @@ export const BentoGridItem = ({
           {description}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
