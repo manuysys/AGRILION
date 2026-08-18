@@ -86,29 +86,94 @@ export default function Home() {
       </section>
 
       {/* SECTION 2: THE PROBLEM (Storytelling) */}
-      <section className="relative min-h-[80vh] flex items-center justify-center pointer-events-none z-10">
-        <div className="max-w-4xl mx-auto px-6 w-full text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
+      <section className="relative min-h-[100vh] flex items-center justify-center pointer-events-none z-10">
+        <div className="max-w-5xl mx-auto px-6 w-full text-center space-y-10">
+          <motion.p
+            initial={{ opacity: 0, y: 40, filter: 'blur(10px)' }}
+            whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
             viewport={{ once: false, margin: "-20%" }}
-            transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+            className="text-3xl md:text-5xl text-white/90 font-light leading-tight"
           >
-            <p className="text-3xl md:text-5xl text-white/80 font-light leading-tight drop-shadow-lg">
-              Cada año se pierden <span className="text-red-500 font-bold">miles de toneladas</span> de granos por falta de visibilidad.<br/><br/>
-              No podemos controlar el clima, pero podemos <span className="text-emerald-500 font-bold">predecir el riesgo.</span>
-            </p>
-          </motion.div>
+            Cada año se pierden{' '}
+            <motion.span
+              initial={{ opacity: 0, scale: 0.8 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: false }}
+              transition={{ delay: 0.3, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              className="text-red-500 font-bold inline-block"
+              style={{ textShadow: '0 0 30px rgba(239,68,68,0.5)' }}
+            >
+              miles de toneladas
+            </motion.span>{' '}
+            de granos por falta de visibilidad.
+          </motion.p>
+
+          <motion.p
+            initial={{ opacity: 0, y: 40, filter: 'blur(10px)' }}
+            whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            viewport={{ once: false, margin: "-20%" }}
+            transition={{ delay: 0.5, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+            className="text-3xl md:text-5xl text-white/90 font-light leading-tight"
+          >
+            No podemos controlar el clima, pero podemos{' '}
+            <motion.span
+              initial={{ opacity: 0, scale: 0.8 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: false }}
+              transition={{ delay: 0.8, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              className="font-bold inline-block"
+              style={{
+                background: 'linear-gradient(135deg, #10b981, #34d399, #6ee7b7)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                textShadow: 'none',
+                filter: 'drop-shadow(0 0 20px rgba(16,185,129,0.4))',
+              }}
+            >
+              predecir el riesgo.
+            </motion.span>
+          </motion.p>
+
+          {/* Decorative separator */}
+          <motion.div
+            initial={{ scaleX: 0 }}
+            whileInView={{ scaleX: 1 }}
+            viewport={{ once: false }}
+            transition={{ delay: 1, duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
+            className="mx-auto h-[1px] w-48"
+            style={{ background: 'linear-gradient(90deg, transparent, #10b981, transparent)' }}
+          />
         </div>
       </section>
 
-      {/* SECTION 3: SHOWSTOPPER (Empty space to let the 3D scroll animation shine) */}
-      <section className="relative h-[150vh] pointer-events-none z-10">
-        <div className="sticky top-1/2 -translate-y-1/2 w-full text-center mix-blend-difference opacity-50">
-          {/* Subtle background text behind the 3D model */}
-          <h2 className="text-[10vw] font-bold tracking-tighter leading-none text-white/5 uppercase">
+      {/* SECTION 3: SHOWSTOPPER — Visible kinetic typography */}
+      <section className="relative h-[150vh] pointer-events-none z-10 mt-[10vh]">
+        <div className="sticky top-1/2 -translate-y-1/2 w-full text-center">
+          <motion.h2
+            initial={{ opacity: 0, scale: 0.85, filter: 'blur(20px)' }}
+            whileInView={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+            viewport={{ once: false, margin: "-10%" }}
+            transition={{ duration: 2, ease: [0.16, 1, 0.3, 1] }}
+            className="text-[12vw] font-black tracking-tighter leading-none uppercase"
+            style={{
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(16,185,129,0.7) 50%, rgba(52,211,153,0.3) 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              filter: 'drop-shadow(0 0 80px rgba(16,185,129,0.3))',
+            }}
+          >
             Visibilidad Total
-          </h2>
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 0.6, y: 0 }}
+            viewport={{ once: false, margin: "-10%" }}
+            transition={{ delay: 0.5, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+            className="text-lg md:text-2xl tracking-[0.3em] uppercase text-emerald-400/60 mt-6 font-light"
+          >
+            Monitoreo inteligente 24/7
+          </motion.p>
         </div>
       </section>
 
