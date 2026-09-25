@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">AGRILION</string>
+
+    <!-- REGLA 3: Textos de Ayuda y Soporte por defecto -->
+    <string name="faq_password_question">¿Cómo restablezco mi contraseña?</string>
+    <string name="faq_password_answer">Para restablecer tu contraseña, ve a la pantalla de Perfil, selecciona \"Cambiar contraseña\" y sigue las instrucciones enviadas a tu correo electrónico registrado.</string>
+
+    <string name="support_email">eest4.74.agrilion@gmail.com</string>
+    <string name="support_phone">+54 9 11 73619555</string>
+
+    <!-- Recomendaciones -->
+    <string name="rec_trigo_girasol">Este mes sus condiciones ambientales fueron excelentes, a este paso el valor de sus semillas se mantendrá estable en el mercado. Se recomienda vender sus bolsas antes que la primavera llegue y se pierda la viabilidad de las condiciones ambientales de su silobolsa.</string>
+    <string name="rec_maiz">Este mes sus condiciones ambientales se deterioraron gradualmente, a este paso el valor de sus semillas se perderá en el mercado. Se recomienda revisar su silobolsa/s X, XX y XXX para sellar su rotura/ forzar la aireación de su silobolsa; para detener el crecimiento de hongos e insectos, y evitar que se pierda el valor en el mercado.</string>
+</resources>

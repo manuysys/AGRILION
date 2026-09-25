@@ -11,7 +11,7 @@ export default function AnomalyBadge({ label, className = '' }: AnomalyBadgeProp
       className={`
         inline-flex items-center gap-1 px-2 py-0.5
         text-xs font-medium rounded-md
-        bg-amber-50 text-amber-700 border border-amber-200
+        bg-amber-500/10 text-amber-400 border border-amber-500/20
         ${className}
       `}
     >

@@ -13,7 +13,7 @@ export function SplineScene({ scene, className }: SplineSceneProps) {
     <Suspense 
       fallback={
         <div className="w-full h-full flex items-center justify-center">
-          <span className="animate-pulse text-zinc-500 text-xs">Cargando Escena 3D...</span>
+          <span className="loader"></span>
         </div>
       }
     >

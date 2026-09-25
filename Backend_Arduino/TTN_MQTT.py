@@ -3,6 +3,7 @@ import ssl
 import os
 import time
 from dotenv import load_dotenv
+# pyrefly: ignore [missing-import]
 from paho.mqtt import client as mqtt_client
 
 # =========================

@@ -1,3 +1,26 @@
+"""
+AGRILION — MQTT → InfluxDB + Firebase Bridge
+==============================================
+
+Este script toma lecturas de HiveMQ y:
+
+    1. INFLUXDB  → Guarda las LECTURAS NUMÉRICAS de sensores (time-series):
+                   temperatura, humedad, CO2, aceleración, delta_CO2, score
+
+    2. FIREBASE  → Actualiza datos CATEGÓRICOS (NO lecturas):
+                   - sensor.lastSeen (cuándo se vio por última vez)
+                   - sensor.active (está prendido/apagado)
+                   - silo.estado (resultado del motor de riesgo)
+                   - silo.alerta (si hay alerta activa)
+
+⚠️  Firebase NO guarda números de sensores (eso va a InfluxDB).
+    Firebase solo guarda el ESTADO de los objetos del sistema (users, silos, sensors).
+
+Esquema esperado en Firestore:
+    - sensors/{device_id}: { ownerUid, siloId, active, lastSeen }
+    - users/{uid}/silos/{silo_id}: { estado, alerta, score, evento, ... }
+"""
+
 import json
 import ssl
 import os
@@ -5,8 +28,7 @@ import time
 from collections import deque
 from dotenv import load_dotenv
 from paho.mqtt import client as mqtt_client
-from influxdb_client import InfluxDBClient, Point
-from influxdb_client.client.write_api import SYNCHRONOUS
+from influxdb_client_3 import InfluxDBClient3, Point
 import firebase_admin
 from firebase_admin import credentials, firestore
 
@@ -30,50 +52,94 @@ HIVEMQ_PASS = os.getenv("HIVEMQ_PASS")
 
 TOPIC = "smisia/#"
 
-# Influx
-INFLUX_URL = os.getenv("INFLUX_URL")
+# InfluxDB 3 Core
+INFLUX_HOST = os.getenv("INFLUX_HOST", os.getenv("INFLUX_URL"))
 INFLUX_TOKEN = os.getenv("INFLUX_TOKEN")
-INFLUX_ORG = os.getenv("INFLUX_ORG")
-INFLUX_BUCKET = os.getenv("INFLUX_BUCKET")
+INFLUX_DATABASE = os.getenv("INFLUX_DATABASE", os.getenv("INFLUX_BUCKET", "silobolsas"))
 
 # =========================
-# FIREBASE
+# FIREBASE (solo para datos categóricos)
 # =========================
-cred = credentials.Certificate("firebase/serviceAccountKey.json")
-firebase_admin.initialize_app(cred)
-db = firestore.client()
+cred_path = "firebase/serviceAccountKey.json"
+try:
+    if not firebase_admin._apps:
+        cred = credentials.Certificate(cred_path)
+        firebase_admin.initialize_app(cred)
+    db = firestore.client()
+    FIREBASE_OK = True
+    print(f"✅ Firebase inicializado (solo para datos categóricos)")
+except Exception as e:
+    print(f"⚠️ Firebase no disponible: {e} — las lecturas seguirán guardándose en InfluxDB")
+    db = None
+    FIREBASE_OK = False
 
+# Caché de device → silo info (para no consultar Firestore en cada lectura)
 device_cache = {}
 
 def get_device_data(device_id):
+    """
+    Obtiene la info del sensor desde Firestore (colección global `sensors`).
+
+    Estructura esperada:
+        sensors/{device_id} = {
+            ownerUid: str,
+            siloId: str,
+            siloPath: str,
+            active: bool,
+            lastSeen: Timestamp
+        }
+
+    Si no existe, intenta lookup legacy en `devices` (compatibilidad).
+    """
     if device_id in device_cache:
         return device_cache[device_id]
 
-    doc = db.collection("devices").document(device_id).get()
+    if not FIREBASE_OK:
+        return None
 
+    # Nuevo esquema: colección global `sensors`
+    doc = db.collection("sensors").document(device_id).get()
     if doc.exists:
         data = doc.to_dict()
         device_cache[device_id] = data
         return data
-    else:
-        print(f"⚠️ Device no registrado: {device_id}")
-        return None
 
-def update_last_seen(device_id):
-    db.collection("devices").document(device_id).set({
-        "last_seen": firestore.SERVER_TIMESTAMP
-    }, merge=True)
+    # Fallback: schema legacy `devices`
+    doc_legacy = db.collection("devices").document(device_id).get()
+    if doc_legacy.exists:
+        data = doc_legacy.to_dict()
+        device_cache[device_id] = data
+        return data
+
+    print(f"⚠️ Sensor no registrado: {device_id}")
+    return None
+
+
+def update_sensor_status(device_id: str):
+    """
+    Actualiza el `lastSeen` del sensor en Firebase.
+
+    ⚠️ NO guarda la lectura numérica — solo marca "se comunicó ahora".
+    """
+    if not FIREBASE_OK:
+        return
+    try:
+        db.collection("sensors").document(device_id).set({
+            "lastSeen": firestore.SERVER_TIMESTAMP,
+            "active": True,
+        }, merge=True)
+    except Exception as e:
+        print(f"⚠️ Error actualizando sensor {device_id}: {e}")
+
 
 # =========================
-# INFLUX
+# INFLUXDB 3 CORE (acá van TODOS los números)
 # =========================
-influx = InfluxDBClient(
-    url=INFLUX_URL,
+influx = InfluxDBClient3(
+    host=INFLUX_HOST,
     token=INFLUX_TOKEN,
-    org=INFLUX_ORG
+    database=INFLUX_DATABASE,
 )
-
-write_api = influx.write_api(write_options=SYNCHRONOUS)
 
 # =========================
 # CONFIG POR GRANO
@@ -82,7 +148,8 @@ CONFIG_GRANOS = {
     "maiz": {"hum_max": 14, "temp_max": 25},
     "soja": {"hum_max": 13, "temp_max": 25},
     "trigo": {"hum_max": 14, "temp_max": 25},
-    "girasol": {"hum_max": 10, "temp_max": 20}
+    "girasol": {"hum_max": 10, "temp_max": 20},
+    "cebada": {"hum_max": 14, "temp_max": 25},
 }
 
 # =========================
@@ -95,7 +162,7 @@ def safe_float(v):
         return 0.0
 
 # =========================
-# HISTORIAL CO2 (clave)
+# HISTORIAL CO2 (clave para detección de fermentación)
 # =========================
 co2_history = {}
 WINDOW = 5
@@ -116,7 +183,7 @@ def calcular_delta(device_id, co2):
     return now - prev
 
 # =========================
-# MOTOR INTELIGENTE
+# MOTOR INTELIGENTE (evalúa riesgo con las lecturas actuales)
 # =========================
 def evaluar_riesgo(data, config):
     co2 = data["co2"]
@@ -128,9 +195,7 @@ def evaluar_riesgo(data, config):
     score = 0
     evento = None
 
-    # =====================
     # CO2 (síntoma principal)
-    # =====================
     if co2 > 1500:
         score += 30
     elif co2 > 800:
@@ -143,32 +208,24 @@ def evaluar_riesgo(data, config):
     elif delta_co2 > 50:
         score += 20
 
-    # =====================
     # HUMEDAD (depende del grano)
-    # =====================
     if hum > 80:
         score += 25
     elif hum > config["hum_max"]:
         score += 15
 
-    # =====================
     # TEMPERATURA
-    # =====================
     if temp > 30:
         score += 25
     elif temp > config["temp_max"]:
         score += 15
 
-    # =====================
     # IMPACTO (evento físico)
-    # =====================
     if impacto:
         score += 20
         evento = "IMPACTO_FISICO"
 
-    # =====================
     # CLASIFICACIÓN
-    # =====================
     if score >= 70:
         estado = "RIESGO_ALTO"
         alerta = "Alta probabilidad de deterioro"
@@ -182,7 +239,7 @@ def evaluar_riesgo(data, config):
     return estado, alerta, score, evento
 
 # =========================
-# ALERT COOLDOWN
+# ALERT COOLDOWN (evitar spam de actualizaciones al silo)
 # =========================
 last_alert_time = {}
 COOLDOWN = 300
@@ -200,15 +257,26 @@ def puede_alertar(device_id):
 
     return False
 
-def actualizar_silo(silo_id, estado, alerta, score, evento, delta):
-    db.collection("silos").document(silo_id).set({
-        "estado": estado,
-        "alerta": alerta,
-        "score": score,
-        "evento": evento,
-        "delta_co2": float(delta),
-        "ultima_actualizacion": firestore.SERVER_TIMESTAMP
-    }, merge=True)
+def actualizar_silo_firebase(owner_uid: str, silo_id: str, estado, alerta, score, evento, delta):
+    """
+    Actualiza el ESTADO del silo en Firebase (datos categóricos).
+
+    NO guarda las lecturas numéricas (esas van a InfluxDB).
+    Guarda: estado, alerta, score, evento, delta_co2, ultima_actualizacion.
+    """
+    if not FIREBASE_OK:
+        return
+    try:
+        db.collection("users").document(owner_uid).collection("silos").document(silo_id).set({
+            "estado": estado,
+            "alerta": alerta,
+            "score": score,
+            "evento": evento,
+            "delta_co2": float(delta),
+            "ultima_actualizacion": firestore.SERVER_TIMESTAMP
+        }, merge=True)
+    except Exception as e:
+        print(f"⚠️ Error actualizando silo {silo_id}: {e}")
 
 # =========================
 # HIVE CLIENT
@@ -236,15 +304,16 @@ def on_hive_message(client, userdata, msg):
         if not info:
             return
 
-        silo_id = info.get("silo_id", "unknown")
-        tipo_grano = info.get("tipo_grano", "maiz")
+        silo_id = info.get("siloId") or info.get("silo_id", "unknown")
+        owner_uid = info.get("ownerUid") or info.get("owner_uid")
+        tipo_grano = info.get("grainType") or info.get("tipo_grano", "maiz")
 
         config = CONFIG_GRANOS.get(tipo_grano, CONFIG_GRANOS["maiz"])
 
         co2 = safe_float(data.get("co2"))
-        hum = safe_float(data.get("humedad"))
-        temp = safe_float(data.get("temperatura"))
-        acc = safe_float(data.get("aceleracion"))
+        hum = safe_float(data.get("humedad") or data.get("humidity"))
+        temp = safe_float(data.get("temperatura") or data.get("temperature"))
+        acc = safe_float(data.get("aceleracion") or data.get("acceleration"))
 
         impacto = acc > 5
 
@@ -259,7 +328,7 @@ def on_hive_message(client, userdata, msg):
         }, config)
 
         # =====================
-        # INFLUX
+        # 1. INFLUXDB (todas las lecturas numéricas van acá)
         # =====================
         point = (
             Point("sensores")
@@ -274,18 +343,22 @@ def on_hive_message(client, userdata, msg):
             .field("score", score)
         )
 
-        write_api.write(bucket=INFLUX_BUCKET, record=point)
+        influx.write(record=point)
 
         # =====================
-        # FIREBASE
+        # 2. FIREBASE (solo datos categóricos / estado del sistema)
         # =====================
-        if puede_alertar(device_id):
-            actualizar_silo(silo_id, estado, alerta, score, evento, delta)
+        # a) Marcar el sensor como activo + actualizar last_seen
+        update_sensor_status(device_id)
 
-        update_last_seen(device_id)
+        # b) Actualizar el estado del silo (con cooldown para no spamear)
+        if puede_alertar(device_id) and owner_uid and silo_id != "unknown":
+            actualizar_silo_firebase(
+                owner_uid, silo_id, estado, alerta, score, evento, delta
+            )
 
         # =====================
-        # LOGS PRO
+        # LOGS
         # =====================
         print(f"\n📥 {device_id} | {tipo_grano}")
         print(f"Estado: {estado} | Score: {score}")
@@ -343,4 +416,6 @@ hive.loop_start()
 ttn.connect(TTN_BROKER, TTN_PORT)
 
 print("🚀 SISTEMA INTELIGENTE ACTIVO")
+print("   → InfluxDB: lecturas numéricas (time-series)")
+print("   → Firebase: estado de sensores y silos (datos categóricos)")
 ttn.loop_forever()

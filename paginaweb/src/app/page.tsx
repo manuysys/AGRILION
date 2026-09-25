@@ -1,275 +1,323 @@
 'use client';
 
-import { motion, useScroll, useTransform } from 'framer-motion';
-import { useRef } from 'react';
-import { ChevronDown, ArrowRight, ShieldCheck, Activity, Cpu } from 'lucide-react';
-import { LiquidButton } from '@/components/ui/liquid-glass-button';
-import { ExpandableTabs } from '@/components/ui/expandable-tabs';
+import { useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Menu, X } from 'lucide-react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 
-import { FeaturesBento } from '@/components/ui/features-bento';
-import { Scene3D } from '@/components/ui/scene-3d';
+// Heavy components loaded dynamically
+const SilobolsaHero = dynamic(() => import('@/components/ui/silobolsa-hero').then(m => m.SilobolsaHero), { ssr: false });
+const ContainerScroll = dynamic(() => import('@/components/ui/container-scroll-animation').then(m => m.ContainerScroll), { ssr: false });
+const SplineScene = dynamic(() => import('@/components/ui/splite').then(m => m.SplineScene), { ssr: false });
+const OrbitingCirclesGlobe = dynamic(() => import('@/components/ui/orbiting-circles-02'), { ssr: false });
+const FlowFieldShader = dynamic(() => import('@/components/ui/flow-field-shader').then(m => m.ShaderBackground), { ssr: false });
+
+// Lighter components
 import { RiveLogo } from '@/components/ui/rive-logo';
-import { DataFlow } from '@/components/ui/data-flow';
+import { Card } from "@/components/ui/card";
+import { Spotlight } from "@/components/ui/spotlight";
+import { FeaturesBento } from "@/components/ui/features-bento";
+import { DashboardPreview } from "@/components/ui/dashboard-preview";
+import { ProblemSection } from "@/components/ui/problem-section";
+import { AiSection } from "@/components/ui/ai-section";
+import { BenefitsSection } from "@/components/ui/benefits-section";
+import { TestimonialsSection } from "@/components/ui/testimonials-section";
+import { PricingSection } from "@/components/ui/pricing-section";
+import { CtaSection } from "@/components/ui/cta-section";
 
-export default function Home() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ["start start", "end end"]
-  });
+const navLinks = [
+  { href: '/', label: 'Inicio' },
+  { href: '#features', label: 'Características' },
+  { href: '#tecnologia', label: 'Tecnología' },
+  { href: '#dashboard', label: 'Dashboard' },
+  { href: '#planes', label: 'Planes' },
+  { href: '#contacto', label: 'Contacto' },
+];
 
-  // Hero parallax effects
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.1], [1, 0]);
-  const heroY = useTransform(scrollYProgress, [0, 0.1], [0, -100]);
+function Navigation() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const handleNavClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (href.startsWith('#')) {
+      e.preventDefault();
+      setMobileMenuOpen(false);
+      const target = document.querySelector(href);
+      if (target) {
+        const offset = 80;
+        const elementPosition = target.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.scrollY - offset;
+        window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+      }
+    }
+  }, []);
 
   return (
-    <div ref={containerRef} className="bg-black text-white min-h-[500vh] selection:bg-emerald-500/30">
-      
-      {/* GLOBAL BACKGROUND 3D SCENE */}
-      <Scene3D />
+    <nav className="fixed top-0 w-full z-50 px-4 pt-4 pointer-events-auto">
+      <div className="max-w-7xl mx-auto flex items-center justify-between bg-zinc-900/70 backdrop-blur-xl border border-white/10 rounded-2xl px-5 py-3 shadow-lg">
+        <Link href="/" className="flex items-center gap-2 group">
+          <RiveLogo className="w-10 h-10 group-hover:scale-110 transition-transform" />
+          <span className="font-black tracking-tighter text-xl text-white uppercase">AGRILION</span>
+        </Link>
 
-      {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 p-6 mix-blend-difference pointer-events-auto">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <RiveLogo className="w-8 h-8 rounded-lg overflow-hidden" />
-            <span className="font-bold text-2xl tracking-tighter">AGRILION<span className="text-emerald-500">+</span></span>
-          </div>
-          <ExpandableTabs 
-            tabs={[
-              { title: "Inicio", icon: Activity },
-              { title: "Flujo", icon: Cpu },
-              { title: "Dashboard", icon: ShieldCheck }
-            ]}
-            onChange={(index) => {
-              if (index === 0) window.scrollTo({ top: 0, behavior: 'smooth' });
-              if (index === 1) document.getElementById('flujo')?.scrollIntoView({ behavior: 'smooth' });
-              if (index === 2) document.getElementById('dashboard')?.scrollIntoView({ behavior: 'smooth' });
-            }}
-          />
-          <Link href="/dashboard" className="hidden md:block px-6 py-2.5 bg-white text-black font-bold rounded-full hover:bg-zinc-200 transition-colors text-sm">
-            ENTRAR
+        {/* Desktop Navigation */}
+        <div className="hidden lg:flex gap-8 text-sm font-medium text-zinc-400">
+          {navLinks.map((link) => (
+            <a
+              key={link.href}
+              href={link.href}
+              onClick={(e) => handleNavClick(e, link.href)}
+              className="hover:text-white transition-colors"
+            >
+              {link.label}
+            </a>
+          ))}
+        </div>
+
+        {/* Desktop Actions */}
+        <div className="hidden lg:flex gap-3 items-center">
+          <Link href="/login" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors">
+            Iniciar sesión
+          </Link>
+          <Link href="/registro" className="bg-white text-zinc-900 px-5 py-2 rounded-full font-semibold text-sm hover:bg-zinc-200 transition-all">
+            Solicitar Demo
           </Link>
         </div>
-      </nav>
 
-      {/* SECTION 1: HERO */}
-      <section className="relative h-screen w-full flex items-center justify-center pointer-events-none z-10">
-        <motion.div 
-          style={{ opacity: heroOpacity, y: heroY }}
-          className="relative flex flex-col items-center justify-center text-center px-4 mt-[-10vh]"
-        >
+        {/* Mobile Menu Button */}
+        <div className="flex lg:hidden gap-2 items-center">
+          <Link href="/registro" className="bg-emerald-500 text-black px-4 py-2 rounded-full font-bold text-xs hover:bg-emerald-400 transition-all">
+            Demo
+          </Link>
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors"
+            aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+          >
+            <AnimatePresence mode="wait">
+              {mobileMenuOpen ? (
+                <motion.div key="close" initial={{ scale: 0, rotate: -90 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0, rotate: 90 }} transition={{ duration: 0.2 }}>
+                  <X className="w-5 h-5" />
+                </motion.div>
+              ) : (
+                <motion.div key="menu" initial={{ scale: 0, rotate: 90 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0, rotate: -90 }} transition={{ duration: 0.2 }}>
+                  <Menu className="w-5 h-5" />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Menu */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="lg:hidden absolute top-full left-4 right-4 mt-2 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl"
           >
-            <h1 className="text-[5rem] md:text-[12rem] font-bold tracking-tighter leading-none text-transparent bg-clip-text bg-gradient-to-b from-white to-white/20 drop-shadow-2xl">
-              AGRILION
-            </h1>
-            <p className="mt-6 text-xl md:text-3xl font-light tracking-[0.2em] text-emerald-400">
-              SABER ES PODER
-            </p>
+            <div className="p-4 flex flex-col gap-1">
+              {navLinks.map((link, i) => (
+                <motion.a
+                  key={link.href}
+                  href={link.href}
+                  onClick={(e) => handleNavClick(e, link.href)}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05, duration: 0.3 }}
+                  className="flex items-center gap-3 py-3 px-4 rounded-xl text-white font-medium hover:bg-white/5 transition-colors"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  {link.label}
+                </motion.a>
+              ))}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.3 }}
+                className="flex flex-col gap-3 mt-4 pt-4 border-t border-white/10"
+              >
+                <Link
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-center py-3 px-4 rounded-xl text-white font-semibold border border-white/10 hover:bg-white/5 transition-colors"
+                >
+                  Iniciar sesión
+                </Link>
+                <Link
+                  href="/registro"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-center py-3 px-4 rounded-full bg-emerald-500 text-black font-bold hover:bg-emerald-400 transition-all"
+                >
+                  Solicitar Demo Gratuita
+                </Link>
+              </motion.div>
+            </div>
           </motion.div>
-          
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1.5, duration: 1 }}
-            className="absolute -bottom-32 flex flex-col items-center"
-          >
-            <span className="text-xs tracking-widest uppercase text-white/50 mb-2 font-bold">DESCUBRIR</span>
-            <ChevronDown className="w-6 h-6 text-emerald-500 animate-bounce drop-shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
-          </motion.div>
-        </motion.div>
-      </section>
+        )}
+      </AnimatePresence>
+    </nav>
+  );
+}
 
-      {/* SECTION 2: THE PROBLEM (Storytelling) */}
-      <section className="relative min-h-[100vh] flex items-center justify-center pointer-events-none z-10">
-        <div className="max-w-5xl mx-auto px-6 w-full text-center space-y-10">
-          <motion.p
-            initial={{ opacity: 0, y: 40, filter: 'blur(10px)' }}
-            whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-            viewport={{ once: false, margin: "-20%" }}
-            transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-            className="text-3xl md:text-5xl text-white/90 font-light leading-tight"
-          >
-            Cada año se pierden{' '}
-            <motion.span
-              initial={{ opacity: 0, scale: 0.8 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: false }}
-              transition={{ delay: 0.3, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              className="text-red-500 font-bold inline-block"
-              style={{ textShadow: '0 0 30px rgba(239,68,68,0.5)' }}
-            >
-              miles de toneladas
-            </motion.span>{' '}
-            de granos por falta de visibilidad.
-          </motion.p>
+export default function Home() {
+  return (
+    <div className="bg-zinc-950 text-white min-h-screen selection:bg-emerald-500/30">
+      
+      <Navigation />
 
-          <motion.p
-            initial={{ opacity: 0, y: 40, filter: 'blur(10px)' }}
-            whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-            viewport={{ once: false, margin: "-20%" }}
-            transition={{ delay: 0.5, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-            className="text-3xl md:text-5xl text-white/90 font-light leading-tight"
-          >
-            No podemos controlar el clima, pero podemos{' '}
-            <motion.span
-              initial={{ opacity: 0, scale: 0.8 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: false }}
-              transition={{ delay: 0.8, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              className="font-bold inline-block"
-              style={{
-                background: 'linear-gradient(135deg, #10b981, #34d399, #6ee7b7)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                textShadow: 'none',
-                filter: 'drop-shadow(0 0 20px rgba(16,185,129,0.4))',
-              }}
-            >
-              predecir el riesgo.
-            </motion.span>
-          </motion.p>
+      {/* HERO */}
+      <SilobolsaHero />
 
-          {/* Decorative separator */}
-          <motion.div
-            initial={{ scaleX: 0 }}
-            whileInView={{ scaleX: 1 }}
-            viewport={{ once: false }}
-            transition={{ delay: 1, duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
-            className="mx-auto h-[1px] w-48"
-            style={{ background: 'linear-gradient(90deg, transparent, #10b981, transparent)' }}
-          />
+      {/* DASHBOARD PREVIEW with scroll animation */}
+      <section id="dashboard" className="relative py-20 bg-zinc-950 overflow-hidden">
+        <div className="absolute inset-0 z-0 opacity-60">
+          <FlowFieldShader className="h-full w-full" />
+        </div>
+        <div className="flex flex-col overflow-hidden relative z-10">
+          <ContainerScroll
+            titleComponent={
+              <div className="pt-20 md:pt-28 mb-4 md:mb-8 px-6 text-center">
+                <span className="text-emerald-500 font-semibold tracking-widest uppercase text-sm mb-4 block">Visibilidad Total</span>
+                <h2 className="text-4xl md:text-6xl font-bold text-white">
+                  Un solo panel para{' '}
+                  <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
+                    todas tus cosechas
+                  </span>
+                </h2>
+                <p className="mt-4 text-zinc-400 text-lg max-w-2xl mx-auto">
+                  Controlá temperatura, humedad y CO₂ de cada silobolsa en tiempo real desde cualquier dispositivo.
+                </p>
+              </div>
+            }
+          >
+            <div className="w-full h-full bg-zinc-900 rounded-2xl overflow-hidden relative border border-zinc-800">
+              <DashboardPreview />
+            </div>
+          </ContainerScroll>
         </div>
       </section>
 
-      {/* SECTION 3: SHOWSTOPPER — Visible kinetic typography */}
-      <section className="relative h-[150vh] pointer-events-none z-10 mt-[10vh]">
-        <div className="sticky top-1/2 -translate-y-1/2 w-full text-center">
-          <motion.h2
-            initial={{ opacity: 0, scale: 0.85, filter: 'blur(20px)' }}
-            whileInView={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-            viewport={{ once: false, margin: "-10%" }}
-            transition={{ duration: 2, ease: [0.16, 1, 0.3, 1] }}
-            className="text-[12vw] font-black tracking-tighter leading-none uppercase"
-            style={{
-              background: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(16,185,129,0.7) 50%, rgba(52,211,153,0.3) 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              filter: 'drop-shadow(0 0 80px rgba(16,185,129,0.3))',
-            }}
-          >
-            Visibilidad Total
-          </motion.h2>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 0.6, y: 0 }}
-            viewport={{ once: false, margin: "-10%" }}
-            transition={{ delay: 0.5, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-            className="text-lg md:text-2xl tracking-[0.3em] uppercase text-emerald-400/60 mt-6 font-light"
-          >
-            Monitoreo inteligente 24/7
-          </motion.p>
-        </div>
-      </section>
-
-      {/* SECTION 4: DATA FLOW (How it Works) */}
-      <section id="flujo" className="relative bg-black border-t border-white/5 pt-32 z-20">
-        <div className="text-center mb-16">
-          <motion.h2 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: false }}
-            className="text-[4rem] md:text-[6rem] font-bold tracking-tighter leading-none"
-          >
-            CÓMO <span className="text-emerald-500">FUNCIONA</span>
-          </motion.h2>
-        </div>
-        <DataFlow />
-      </section>
-
-      {/* SECTION 5: FEATURES BENTO */}
-      <section id="features" className="relative bg-black py-12 z-20">
+      {/* FEATURES BENTO */}
+      <section id="features">
         <FeaturesBento />
       </section>
 
-      {/* SECTION 6: DASHBOARD */}
-      <section id="dashboard" className="relative min-h-screen flex items-center justify-center py-32 bg-zinc-950 z-20 border-t border-white/5">
-        <div className="max-w-7xl mx-auto px-6 w-full flex flex-col md:flex-row items-center gap-16">
-          
-          <motion.div
-            initial={{ opacity: 0, x: -100 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: false, margin: "-20%" }}
-            transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
-            className="flex-1"
-          >
-            <h2 className="text-[3rem] md:text-[6rem] font-bold tracking-tighter leading-none mb-6">
-              CONTROL<br/>ABSOLUTO.
-            </h2>
-            <p className="text-xl md:text-3xl text-zinc-400 font-light leading-snug">
-              Una interfaz diseñada para la claridad. Alertas críticas antes de que ocurran pérdidas.
-            </p>
-            <div className="mt-12">
-              <Link href="/dashboard">
-                <LiquidButton className="text-xl px-8 py-4 bg-white text-black hover:bg-emerald-400 hover:text-black">
-                  Explorar Dashboard <ArrowRight className="ml-2 w-6 h-6 inline" />
-                </LiquidButton>
-              </Link>
-            </div>
-          </motion.div>
+      {/* THE PROBLEM */}
+      <ProblemSection />
 
-          <motion.div
-             initial={{ opacity: 0, rotateY: 30, scale: 0.8 }}
-             whileInView={{ opacity: 1, rotateY: 0, scale: 1 }}
-             viewport={{ once: false, margin: "-20%" }}
-             transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-             className="flex-1 w-full"
-          >
-             <div className="relative z-10 glass-dark rounded-3xl p-8 border border-white/10 shadow-[0_0_50px_rgba(16,185,129,0.1)] flex flex-col gap-6 transform perspective-1000">
-                <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                  <div className="w-1/3 h-4 bg-white/20 rounded-full" />
-                  <div className="w-12 h-4 bg-emerald-500/50 rounded-full" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="h-32 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-center">
-                     <span className="text-5xl font-bold text-emerald-400 drop-shadow-md">18°</span>
-                  </div>
-                  <div className="h-32 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-center">
-                     <span className="text-5xl font-bold text-emerald-400 drop-shadow-md">14%</span>
-                  </div>
-                </div>
-                <div className="h-48 bg-white/5 rounded-2xl border border-white/5 w-full mt-4 flex items-end p-4 gap-2">
-                   {[40, 60, 45, 80, 50, 90, 70].map((h, i) => (
-                     <div key={i} className="flex-1 bg-emerald-500/30 rounded-t-sm transition-all duration-1000" style={{ height: `${h}%` }} />
-                   ))}
-                </div>
-             </div>
-          </motion.div>
-        </div>
+      {/* AI ASSISTANT */}
+      <section className="py-20 px-6 max-w-7xl mx-auto">
+        <Card className="w-full min-h-[500px] md:min-h-[560px] bg-zinc-900 border-zinc-800 relative overflow-hidden rounded-3xl">
+          <Spotlight
+            className="-top-40 left-0 md:left-60 md:-top-20"
+            fill="rgba(16,185,129,0.3)"
+          />
+          
+          <div className="flex flex-col md:flex-row h-full">
+            {/* Left content */}
+            <div className="flex-1 p-8 md:p-16 relative z-10 flex flex-col justify-center">
+              <span className="text-emerald-500 font-semibold tracking-widest uppercase text-xs mb-4 block">IA Conversacional</span>
+              <h2 className="text-4xl md:text-5xl font-bold text-white">
+                Tu asistente granjero con IA
+              </h2>
+              <p className="mt-4 text-zinc-400 max-w-lg text-lg leading-relaxed">
+                Hablá con nuestro asistente virtual para analizar los datos de tus silobolsas. Preguntale sobre riesgos de fermentación, predicciones climáticas y estado general de tus granos.
+              </p>
+              <div className="mt-8 flex flex-col sm:flex-row gap-3">
+                <Link href="/dashboard/ia" className="inline-flex items-center justify-center px-6 py-3 bg-white text-zinc-900 font-bold rounded-full hover:scale-105 transition-transform">
+                  Iniciar Chat
+                </Link>
+                <Link href="#tecnologia" className="inline-flex items-center justify-center px-6 py-3 bg-white/5 border border-white/10 text-white font-bold rounded-full hover:bg-white/10 transition-all">
+                  Ver Tecnología
+                </Link>
+              </div>
+            </div>
+
+            {/* Right content (Spline Scene) */}
+            <div className="flex-1 relative min-h-[300px]">
+              <SplineScene 
+                scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+                className="w-full h-full scale-[1.2] translate-y-10"
+              />
+            </div>
+          </div>
+        </Card>
       </section>
 
-      {/* SECTION 7: FOOTER CTA */}
-      <footer className="relative py-32 bg-black flex flex-col items-center justify-center text-center px-4 z-20">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=2000&auto=format&fit=crop')] opacity-10 mix-blend-overlay object-cover" />
-        <motion.div
-           initial={{ opacity: 0, y: 50 }}
-           whileInView={{ opacity: 1, y: 0 }}
-           viewport={{ once: false }}
-           transition={{ duration: 1 }}
-           className="relative z-10 max-w-4xl"
-        >
-          <h2 className="text-[3rem] md:text-[5rem] font-bold tracking-tighter mb-8 leading-tight">
-            Protegé tu cosecha antes de que aparezcan las pérdidas.
-          </h2>
-          <LiquidButton className="text-2xl px-12 py-6 bg-emerald-500 text-black font-bold">
-            Solicitar Demo
-          </LiquidButton>
-        </motion.div>
+      {/* TECHNOLOGY STACK — Orbiting Circles Globe */}
+      <section id="tecnologia" className="relative bg-black border-t border-white/5 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(16,185,129,0.08),transparent_60%)] pointer-events-none" />
+        <div className="max-w-5xl mx-auto px-6 pt-20 pb-0 relative z-10 text-center">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-4xl md:text-5xl font-bold tracking-tight text-white mb-4"
+          >
+            Stack Tecnológico <span className="text-emerald-500">Completo</span>
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="text-zinc-400 text-lg md:text-xl max-w-2xl mx-auto mb-12"
+          >
+            Hardware robusto + software inteligente. Una solución End-to-End diseñada para el entorno rural.
+          </motion.p>
+        </div>
+        <OrbitingCirclesGlobe />
+      </section>
+
+      {/* AI ENGINE */}
+      <AiSection />
+
+      {/* BENEFITS */}
+      <BenefitsSection />
+
+      {/* TESTIMONIALS */}
+      <TestimonialsSection />
+
+      {/* PRICING */}
+      <section id="planes">
+        <PricingSection />
+      </section>
+
+      {/* CALL TO ACTION */}
+      <section id="contacto">
+        <CtaSection />
+      </section>
+
+      {/* FOOTER */}
+      <footer className="relative z-10 bg-zinc-950 py-20 border-t border-white/5 text-center">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col items-center">
+          <RiveLogo className="w-16 h-16 mb-4 opacity-60" />
+          <h2 className="text-2xl font-bold tracking-tight text-white mb-2">Agrilion</h2>
+          <p className="text-zinc-500 mb-8 max-w-md text-sm">
+            Sistema inteligente de monitoreo de granos. Prevení pérdidas antes de que ocurran.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 mb-16">
+            <Link href="/dashboard" className="px-8 py-3 bg-emerald-500 text-black font-bold rounded-full hover:bg-emerald-400 hover:scale-105 transition-all">
+              Probar Demo
+            </Link>
+            <Link href="/registro" className="px-8 py-3 bg-white/5 text-white border border-white/10 font-bold rounded-full hover:bg-white/10 transition-all">
+              Solicitar Info
+            </Link>
+          </div>
+          <div className="w-full border-t border-white/5 pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-zinc-600">
+            <span>&copy; {new Date().getFullYear()} Agrilion. Todos los derechos reservados.</span>
+            <div className="flex gap-6 mt-4 md:mt-0">
+              <a href="#" className="hover:text-emerald-500 transition-colors">Términos</a>
+              <a href="#" className="hover:text-emerald-500 transition-colors">Privacidad</a>
+              <a href="#" className="hover:text-emerald-500 transition-colors">Contacto</a>
+            </div>
+          </div>
+        </div>
       </footer>
 
     </div>

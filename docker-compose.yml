@@ -1,0 +1,145 @@
+# =============================================================================
+# AGRILION — Docker Compose (Despliegue Completo)
+# =============================================================================
+#
+# Este archivo orquesta todos los servicios del sistema Agrilion:
+#   - ai-api: FastAPI (inteligencia artificial + chatbot)
+#   - web: Next.js (frontend)
+#   - backend: Scripts Python (MQTT → InfluxDB + Firebase)
+#   - influxdb: Base de datos de series temporales (lecturas de sensores)
+#
+# Uso:
+#   1. Copiar .env.example → .env en cada carpeta y completar credenciales
+#   2. Colocar firebase/serviceAccountKey.json en Inteligencia_Artificial/
+#   3. docker-compose up -d
+#   4. Abrir http://localhost:3000 (web) o http://localhost:8000/docs (API)
+#
+# Variables de entorno requeridas:
+#   - GROQ_API_KEY (para el chatbot)
+#   - INFLUX_URL, INFLUX_TOKEN, INFLUX_ORG, INFLUX_BUCKET
+#   - HiveMQ credentials (para backend)
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ─── AI API (FastAPI) ───────────────────────────────────────────────────────
+  ai-api:
+    build:
+      context: ./Inteligencia_Artificial
+      dockerfile: Dockerfile
+    container_name: agrilion-ai-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./Inteligencia_Artificial/.env
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+    volumes:
+      - ./Inteligencia_Artificial/firebase:/app/firebase:ro
+      - ai-models:/app/models
+    restart: unless-stopped
+    networks:
+      - agrilion-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ─── Web Frontend (Next.js) ─────────────────────────────────────────────────
+  web:
+    build:
+      context: ./paginaweb
+      dockerfile: Dockerfile
+    container_name: agrilion-web
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./paginaweb/.env.local
+    environment:
+      - NEXT_PUBLIC_MOCK_MODE=false
+      - AI_API_URL=http://ai-api:8000
+    depends_on:
+      ai-api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - agrilion-network
+
+  # ─── Backend Scripts (MQTT → InfluxDB + Firebase) ──────────────────────────
+  backend:
+    build:
+      context: ./Backend_Arduino
+      dockerfile: Dockerfile
+    container_name: agrilion-backend
+    env_file:
+      - ./Backend_Arduino/.env
+    volumes:
+      - ./Backend_Arduino/firebase:/app/firebase:ro
+    depends_on:
+      - ai-api
+    restart: unless-stopped
+    networks:
+      - agrilion-network
+    # Este contenedor corre los 3 scripts en paralelo:
+    #   - TTN_MQTT.py
+    #   - MQTT_INFLUXDB_FIREBASE.py
+    #   - mqtt_to_ai_bridge.py
+
+  # ─── InfluxDB 3 Core (Time-Series Database) ────────────────────────────────
+  # InfluxDB 3 Core (open source, basado en Apache Arrow/DataFusion/Parquet)
+  # Puerto API: 8181 (NO 8086 como la v2)
+  # Setup inicial: ir a http://localhost:8888 (Explorer UI) y crear token + database
+  influxdb:
+    image: influxdb:3-core
+    container_name: agrilion-influxdb3
+    ports:
+      - "8181:8181"     # HTTP API
+      - "8182:8182"     # gRPC (Flight)
+    volumes:
+      - influxdb3-data:/var/lib/influxdb3
+      - influxdb3-plugins:/plugins
+    environment:
+      - INFLUXDB3_HTTP_BIND=0.0.0.0:8181
+    restart: unless-stopped
+    networks:
+      - agrilion-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8181/api/v2/ping || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ─── InfluxDB 3 Explorer UI ────────────────────────────────────────────────
+  # UI web para crear tokens, databases, explorar datos y ejecutar queries SQL
+  # Acceder en: http://localhost:8888
+  influxdb-ui:
+    image: influxdata/influxdb3-ui
+    container_name: agrilion-influxdb3-ui
+    ports:
+      - "8888:80"      # UI web
+      - "8889:8888"    # API de la UI
+    environment:
+      - INFLUX_HOST=http://influxdb:8181
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - agrilion-network
+
+networks:
+  agrilion-network:
+    driver: bridge
+
+volumes:
+  ai-models:
+    driver: local
+  influxdb3-data:
+    driver: local
+  influxdb3-plugins:
+    driver: local

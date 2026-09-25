@@ -6,278 +6,312 @@ import { useRef, useState, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { random } from 'maath';
 
-// ─── Procedural plastic normal map ──────────────────────────────────
-function createPlasticNormalMap(): THREE.CanvasTexture {
-  const size = 512;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d')!;
+// Suppress THREE.Clock deprecation warning (Three.js v0.184 deprecated Clock
+// in favor of Timer, but R3F still uses Clock internally — upstream issue)
+if (typeof window !== 'undefined') {
+  const _warn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    if (typeof args[0] === 'string' && args[0].includes('THREE.Clock')) return;
+    _warn.apply(console, args);
+  };
+}
 
-  // Base neutral normal
-  ctx.fillStyle = 'rgb(128,128,255)';
-  ctx.fillRect(0, 0, size, size);
+// ═══════════════════════════════════════════════════════════════════════
+// PROCEDURAL TEXTURES
+// ═══════════════════════════════════════════════════════════════════════
 
-  // Horizontal wrinkles (longitudinal creases)
-  for (let i = 0; i < 150; i++) {
-    const y = Math.random() * size;
-    const x = Math.random() * size;
-    const w = 40 + Math.random() * 100;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + w, y + (Math.random() - 0.5) * 8);
-    const shade = 110 + Math.floor(Math.random() * 36);
-    ctx.strokeStyle = `rgba(${shade},${shade},255,0.5)`;
-    ctx.lineWidth = 0.5 + Math.random() * 1.5;
-    ctx.stroke();
+function createNormalMap(): THREE.CanvasTexture {
+  const S = 512;
+  const c = document.createElement('canvas');
+  c.width = S; c.height = S;
+  const g = c.getContext('2d')!;
+
+  g.fillStyle = 'rgb(128,128,255)';
+  g.fillRect(0, 0, S, S);
+
+  // Longitudinal wrinkles
+  for (let i = 0; i < 120; i++) {
+    const x = Math.random() * S;
+    const y = Math.random() * S;
+    const len = 50 + Math.random() * 150;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.quadraticCurveTo(x + len * 0.5, y + (Math.random() - 0.5) * 12, x + len, y + (Math.random() - 0.5) * 6);
+    const nv = 108 + Math.floor(Math.random() * 40);
+    g.strokeStyle = `rgba(${nv},${nv},255,0.45)`;
+    g.lineWidth = 0.5 + Math.random() * 2;
+    g.stroke();
   }
 
   // Grain bumps underneath
-  for (let i = 0; i < 600; i++) {
-    const x = Math.random() * size;
-    const y = Math.random() * size;
-    const r = 2 + Math.random() * 5;
-    const shade = 118 + Math.floor(Math.random() * 20);
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(${shade},${shade},255,0.2)`;
-    ctx.fill();
+  for (let i = 0; i < 800; i++) {
+    const x = Math.random() * S;
+    const y = Math.random() * S;
+    const r = 1.5 + Math.random() * 4;
+    const nx = 128 + Math.floor((Math.random() - 0.5) * 30);
+    const ny = 128 + Math.floor((Math.random() - 0.5) * 30);
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fillStyle = `rgba(${nx},${ny},255,0.18)`;
+    g.fill();
   }
 
-  // Large creases
-  for (let i = 0; i < 20; i++) {
-    const x1 = Math.random() * size;
-    const y1 = Math.random() * size;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.quadraticCurveTo(
-      x1 + (Math.random() - 0.5) * 150,
-      y1 + (Math.random() - 0.5) * 30,
-      x1 + (Math.random() - 0.5) * 300,
-      y1 + (Math.random() - 0.5) * 20
-    );
-    ctx.strokeStyle = `rgba(${105 + Math.random() * 46},128,255,0.35)`;
-    ctx.lineWidth = 1 + Math.random() * 2;
-    ctx.stroke();
+  // Broad undulations
+  for (let i = 0; i < 8; i++) {
+    const cx = Math.random() * S;
+    const cy = Math.random() * S;
+    const rad = 30 + Math.random() * 80;
+    const grad = g.createRadialGradient(cx, cy, 0, cx, cy, rad);
+    const ns = Math.floor((Math.random() - 0.5) * 20);
+    grad.addColorStop(0, `rgba(${128 + ns},${128 + ns},255,0.2)`);
+    grad.addColorStop(1, 'rgba(128,128,255,0)');
+    g.fillStyle = grad;
+    g.fillRect(cx - rad, cy - rad, rad * 2, rad * 2);
   }
 
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(3, 1);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(4, 1.5);
   return tex;
 }
 
-// ─── Procedural roughness map ───────────────────────────────────────
+function createDiffuseMap(): THREE.CanvasTexture {
+  const S = 512;
+  const c = document.createElement('canvas');
+  c.width = S; c.height = S;
+  const g = c.getContext('2d')!;
+
+  // Off-white plastic base
+  g.fillStyle = '#d8d4cc';
+  g.fillRect(0, 0, S, S);
+
+  // Dirt stains
+  for (let i = 0; i < 15; i++) {
+    const cx = Math.random() * S;
+    const cy = Math.random() * S;
+    const rad = 20 + Math.random() * 100;
+    const grad = g.createRadialGradient(cx, cy, 0, cx, cy, rad);
+    const colors = ['rgba(180,170,145,0.12)', 'rgba(165,155,130,0.1)', 'rgba(190,180,160,0.08)'];
+    grad.addColorStop(0, colors[Math.floor(Math.random() * 3)]);
+    grad.addColorStop(1, 'rgba(216,212,204,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, S, S);
+  }
+
+  // Fine dust
+  for (let i = 0; i < 2000; i++) {
+    const x = Math.random() * S;
+    const y = Math.random() * S;
+    const v = 170 + Math.floor(Math.random() * 50);
+    g.fillStyle = `rgba(${v},${v - 5},${v - 15},0.06)`;
+    g.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
+  }
+
+  // Printed Branding Text
+  g.save();
+  g.translate(S / 2, S / 2);
+  g.rotate(-Math.PI / 2); // Rotate text so it reads along the length
+  g.fillStyle = 'rgba(20, 20, 20, 0.7)';
+  g.font = 'bold 36px monospace';
+  g.textAlign = 'center';
+  g.fillText('SILO-BOLSA', 0, -40);
+  g.font = '24px monospace';
+  g.fillText('AGRICULTURA ARG.', 0, -10);
+  g.font = '16px monospace';
+  g.fillText('100% VIRGEN - 7 CAPAS', 0, 15);
+  // Barcode simulation
+  for (let i = 0; i < 40; i++) {
+    const w = Math.random() > 0.5 ? 2 : 4;
+    g.fillRect(-100 + i * 5, 30, w, 20);
+  }
+  g.restore();
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(4, 1.5);
+  return tex;
+}
+
 function createRoughnessMap(): THREE.CanvasTexture {
-  const size = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d')!;
+  const S = 256;
+  const c = document.createElement('canvas');
+  c.width = S; c.height = S;
+  const g = c.getContext('2d')!;
 
-  ctx.fillStyle = 'rgb(150,150,150)';
-  ctx.fillRect(0, 0, size, size);
+  g.fillStyle = 'rgb(175,175,175)';
+  g.fillRect(0, 0, S, S);
 
-  for (let i = 0; i < 600; i++) {
-    const x = Math.random() * size;
-    const y = Math.random() * size;
-    const r = 3 + Math.random() * 15;
-    const v = 110 + Math.floor(Math.random() * 90);
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(${v},${v},${v},0.25)`;
-    ctx.fill();
+  for (let i = 0; i < 400; i++) {
+    const x = Math.random() * S;
+    const y = Math.random() * S;
+    const r = 3 + Math.random() * 20;
+    const v = 140 + Math.floor(Math.random() * 70);
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fillStyle = `rgba(${v},${v},${v},0.2)`;
+    g.fill();
   }
 
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(3, 1);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(4, 1.5);
   return tex;
 }
 
-// ─── Silobolsa Geometry ─────────────────────────────────────────────
-// Fully sealed tube with integrated wrinkle detail at ends
+// ═══════════════════════════════════════════════════════════════════════
+// SILOBOLSA GEOMETRY — Built on THREE.CylinderGeometry (guaranteed valid)
+// ═══════════════════════════════════════════════════════════════════════
+//
+// Strategy: Start from a standard CylinderGeometry (which has correct
+// normals, UVs, indices, and caps with NO NaN issues), then modify
+// vertex positions to create the silobolsa shape.
+//
 function createSilobolsaGeometry(
   length: number,
   radius: number,
-  radialSegments: number,
-  lengthSegments: number,
-  seed: number = 42
-): THREE.BufferGeometry {
-  const geo = new THREE.BufferGeometry();
-  const positions: number[] = [];
-  const normals: number[] = [];
-  const uvs: number[] = [];
-  const indices: number[] = [];
+  radialSegs: number,
+  lengthSegs: number,
+  seed: number
+): THREE.CylinderGeometry {
+  const geo = new THREE.CylinderGeometry(radius, radius, length, radialSegs, lengthSegs, false);
+  const pos = geo.getAttribute('position');
+  const halfLen = length / 2;
 
-  const seededRandom = (n: number) => {
+  const hash = (n: number) => {
     const x = Math.sin(n * 127.1 + seed * 311.7) * 43758.5453;
     return x - Math.floor(x);
   };
 
-  const halfLen = length / 2;
+  for (let i = 0; i < pos.count; i++) {
+    const px = pos.getX(i);
+    const py = pos.getY(i);
+    const pz = pos.getZ(i);
 
-  for (let j = 0; j <= lengthSegments; j++) {
-    const t = j / lengthSegments;
-    const z = -halfLen + t * length;
+    const dist = Math.sqrt(px * px + pz * pz);
+    const angle = Math.atan2(pz, px);
+    const t = (py + halfLen) / length;
 
-    for (let i = 0; i <= radialSegments; i++) {
-      const theta = (i / radialSegments) * Math.PI * 2;
-      const cosT = Math.cos(theta);
-      const sinT = Math.sin(theta);
+    if (dist < 0.001) continue;
 
-      let r = radius;
-
-      // 1. End taper — smooth close to zero at tips
-      const endFalloff = 0.13;
-      let endFactor = 1.0;
-      if (t < endFalloff) {
-        const et = t / endFalloff;
-        endFactor = et * et * (3 - 2 * et); // smoothstep to 0
-      } else if (t > 1 - endFalloff) {
-        const et = (1 - t) / endFalloff;
-        endFactor = et * et * (3 - 2 * et);
-      }
-      r *= endFactor;
-
-      // 2. End wrinkles — radial folds near tips (integrated, no separate mesh)
-      if (endFactor < 0.9 && endFactor > 0.01) {
-        const wrinkle = Math.sin(theta * 7) * 0.015 * (1 - endFactor);
-        r += wrinkle;
-        // Slight twist
-        const twist = (1 - endFactor) * 0.5;
-        const twistedR = Math.sin((theta + twist) * 5) * 0.008 * (1 - endFactor);
-        r += twistedR;
-      }
-
-      // 3. Gravity sag
-      if (sinT < 0) {
-        r *= 1.0 - 0.15 * Math.abs(sinT);
+    let newR = dist;
+    
+    // 1. Scrunched ends like a tied plastic bag
+    const endZone = 0.14; 
+    let endScale = 1.0;
+    
+    const getShape = (p: number) => {
+      if (p > 0.02) {
+        // Dome part
+        const pNorm = (p - 0.02) / 0.98;
+        const x = 1.0 - pNorm;
+        return 0.12 + 0.88 * Math.sqrt(Math.max(0, 1 - Math.pow(x, 2.2)));
       } else {
-        r *= 1.0 + 0.05 * sinT;
+        // The tied knot
+        return 0.03 + 0.09 * (p / 0.02);
       }
+    };
 
-      // 4. Grain bumps
-      const b1 = seededRandom(j * 17 + i * 7);
-      const b2 = seededRandom(j * 31 + i * 13);
-      const bump = Math.sin(t * Math.PI * 8 + theta * 3) * 0.025 * b1
-        + Math.sin(t * Math.PI * 14 + theta * 5) * 0.015 * b2
-        + Math.sin(t * Math.PI * 4) * Math.cos(theta * 2) * 0.02;
-      r += bump * endFactor;
+    if (t < endZone) endScale = getShape(t / endZone);
+    else if (t > 1 - endZone) endScale = getShape((1 - t) / endZone);
+    
+    newR *= endScale;
 
-      // 5. Belly sag
-      r += Math.sin(t * Math.PI) * 0.05;
-
-      // Clamp to avoid negative radius
-      r = Math.max(r, 0);
-
-      positions.push(cosT * r, sinT * r, z);
-      normals.push(cosT, sinT, 0);
-      uvs.push(i / radialSegments, t);
+    // 2. Heavy longitudinal wrinkles (arrugas características)
+    if (endScale < 0.98) {
+      // Strong sharp folds at the ends
+      const intensity = Math.pow(1 - endScale, 1.2) * 3.0; // Increased
+      newR += Math.sin(angle * 18) * 0.03 * intensity * radius;
+      newR += Math.sin(angle * 28 + 1.2) * 0.02 * intensity * radius;
+      newR += Math.cos(angle * 10 - 0.5) * 0.025 * intensity * radius;
     }
-  }
 
-  // Index buffer
-  for (let j = 0; j < lengthSegments; j++) {
-    for (let i = 0; i < radialSegments; i++) {
-      const a = j * (radialSegments + 1) + i;
-      const b = a + radialSegments + 1;
-      const c = a + 1;
-      const d = b + 1;
-      indices.push(a, b, c);
-      indices.push(c, b, d);
+    // Body longitudinal folds (the plastic stretching)
+    if (endScale > 0.4) {
+      newR += Math.sin(angle * 8 + t * 2) * 0.015 * endScale;
+      newR += Math.cos(angle * 14 - t * 3) * 0.01 * endScale;
+      newR += Math.sin(angle * 5) * 0.018 * endScale;
     }
+
+    // 3. Gravity sag
+    const sinAngle = Math.sin(angle);
+    if (sinAngle < 0) {
+      newR *= 1.0 - 0.15 * Math.abs(sinAngle) * endScale; // flatten bottom heavily
+    } else {
+      newR *= 1.0 + 0.02 * sinAngle * endScale; // round top slightly
+    }
+
+    // 4. Irregular bumps (grain inside)
+    if (endScale > 0.7) {
+      const idx = Math.floor(t * lengthSegs);
+      const ai = Math.floor((angle / (Math.PI * 2) + 0.5) * radialSegs);
+      const bump = hash(idx * 13 + ai * 7) * 0.004;
+      newR += bump * endScale;
+    }
+
+    // 5. Belly sag
+    newR += Math.sin(t * Math.PI) * 0.04 * endScale;
+
+    // 6. Transversal plastic seams
+    if (endScale > 0.9) {
+      newR += Math.sin(t * Math.PI * 80) * 0.002;
+    }
+
+    newR = Math.max(newR, radius * 0.01);
+    const scale = newR / dist;
+    pos.setX(i, px * scale);
+    pos.setZ(i, pz * scale);
   }
 
-  // Front cap
-  const fc = positions.length / 3;
-  positions.push(0, 0, -halfLen);
-  normals.push(0, 0, -1);
-  uvs.push(0.5, 0);
-  for (let i = 0; i < radialSegments; i++) {
-    indices.push(fc, i + 1, i);
-  }
-
-  // Back cap
-  const bc = positions.length / 3;
-  positions.push(0, 0, halfLen);
-  normals.push(0, 0, 1);
-  uvs.push(0.5, 1);
-  const lastRow = lengthSegments * (radialSegments + 1);
-  for (let i = 0; i < radialSegments; i++) {
-    indices.push(bc, lastRow + i, lastRow + i + 1);
-  }
-
-  geo.setIndex(indices);
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geo.computeVertexNormals();
-
   return geo;
 }
 
-// ─── Sensor HUD Card ────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════
+// SENSOR HUD
+// ═══════════════════════════════════════════════════════════════════════
+
 function SensorHUD({
-  position,
-  anchorPos,
-  label,
-  value,
-  unit,
-  color,
-  icon,
-  scrollProgress,
+  anchorPos, position, label, value, unit, color, icon, visible,
 }: {
-  position: [number, number, number];
   anchorPos: [number, number, number];
+  position: [number, number, number];
   label: string;
   value: number | string;
   unit: string;
   color: string;
   icon: string;
-  scrollProgress: number;
+  visible: boolean;
 }) {
   const dotRef = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
     if (dotRef.current) {
-      const s = 1 + Math.sin(state.clock.elapsedTime * 3) * 0.4;
-      dotRef.current.scale.setScalar(s);
+      dotRef.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 3) * 0.35);
     }
   });
 
-  // Midpoint arc
   const mid: [number, number, number] = [
     (anchorPos[0] + position[0]) / 2,
-    Math.max(anchorPos[1], position[1]) + 0.2,
+    Math.max(anchorPos[1], position[1]) + 0.15,
     (anchorPos[2] + position[2]) / 2,
   ];
 
-  const visible = scrollProgress < 0.35;
-
   return (
     <group>
-      {/* Connector line */}
       <Line
         points={[anchorPos, mid, position]}
         color={color}
         lineWidth={1.5}
         transparent
-        opacity={visible ? 0.5 : 0}
+        opacity={visible ? 0.45 : 0}
         dashed
         dashSize={0.04}
         gapSize={0.025}
       />
-
-      {/* Pulsing dot on silo surface */}
       <mesh ref={dotRef} position={anchorPos}>
         <sphereGeometry args={[0.018, 8, 8]} />
         <meshBasicMaterial color={color} transparent opacity={visible ? 1 : 0} />
       </mesh>
-
-      {/* HUD card */}
       <Html
         position={position}
         className="pointer-events-none"
@@ -287,57 +321,30 @@ function SensorHUD({
           transform: 'translate(-50%, -50%)',
         }}
       >
-        <div
-          style={{
-            background: 'rgba(0,0,0,0.75)',
-            backdropFilter: 'blur(16px)',
-            border: `1px solid ${color}40`,
-            borderRadius: '14px',
-            boxShadow: `0 0 24px ${color}18, inset 0 1px 0 rgba(255,255,255,0.06)`,
-            minWidth: '130px',
-            overflow: 'hidden',
-          }}
-        >
-          {/* Top accent line */}
-          <div style={{
-            height: '2px',
-            background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
-          }} />
+        <div style={{
+          background: 'rgba(0,0,0,0.78)',
+          backdropFilter: 'blur(16px)',
+          border: `1px solid ${color}40`,
+          borderRadius: '14px',
+          boxShadow: `0 0 24px ${color}18, inset 0 1px 0 rgba(255,255,255,0.06)`,
+          minWidth: '130px',
+          overflow: 'hidden',
+        }}>
+          <div style={{ height: '2px', background: `linear-gradient(90deg, transparent, ${color}, transparent)` }} />
           <div style={{ padding: '10px 14px' }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              marginBottom: '4px',
-            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
               <span style={{ fontSize: '13px' }}>{icon}</span>
               <span style={{
-                fontSize: '9px',
-                fontWeight: 700,
-                letterSpacing: '0.12em',
-                textTransform: 'uppercase' as const,
-                color: `${color}cc`,
-              }}>
-                {label}
-              </span>
+                fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em',
+                textTransform: 'uppercase' as const, color: `${color}cc`,
+              }}>{label}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '3px' }}>
               <span style={{
-                fontSize: '22px',
-                fontWeight: 900,
-                color: color,
-                textShadow: `0 0 14px ${color}50`,
-                fontFamily: 'monospace',
-              }}>
-                {value}
-              </span>
-              <span style={{
-                fontSize: '11px',
-                color: 'rgba(255,255,255,0.4)',
-                fontWeight: 500,
-              }}>
-                {unit}
-              </span>
+                fontSize: '22px', fontWeight: 900, color,
+                textShadow: `0 0 14px ${color}50`, fontFamily: 'monospace',
+              }}>{value}</span>
+              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>{unit}</span>
             </div>
           </div>
         </div>
@@ -346,55 +353,51 @@ function SensorHUD({
   );
 }
 
-// ─── Realistic Silobolsa ────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════
+// SILOBOLSA COMPONENT
+// ═══════════════════════════════════════════════════════════════════════
+
 function RealisticSilobolsa() {
   const groupRef = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.Mesh>(null);
-  const originalPositions = useRef<Float32Array | null>(null);
+  const origPositions = useRef<Float32Array | null>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
 
   useEffect(() => {
-    const handleScroll = () => {
-      const totalScroll = document.body.scrollHeight - window.innerHeight;
-      setScrollProgress(totalScroll > 0 ? window.scrollY / totalScroll : 0);
+    const onScroll = () => {
+      const total = document.body.scrollHeight - window.innerHeight;
+      setScrollProgress(total > 0 ? window.scrollY / total : 0);
     };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   const [liveData, setLiveData] = useState({ hum: 18.2, co2: 1200, temp: 22.1 });
-
   useEffect(() => {
-    const interval = setInterval(() => {
-      setLiveData(prev => ({
-        hum: Number((prev.hum + (Math.random() * 0.4 - 0.2)).toFixed(1)),
-        co2: Math.floor(prev.co2 + (Math.random() * 10 - 5)),
-        temp: Number((prev.temp + (Math.random() * 0.2 - 0.1)).toFixed(1)),
+    const id = setInterval(() => {
+      setLiveData(p => ({
+        hum: Number((p.hum + (Math.random() * 0.4 - 0.2)).toFixed(1)),
+        co2: Math.floor(p.co2 + (Math.random() * 10 - 5)),
+        temp: Number((p.temp + (Math.random() * 0.2 - 0.1)).toFixed(1)),
       }));
     }, 2000);
-    return () => clearInterval(interval);
+    return () => clearInterval(id);
   }, []);
 
   // Textures
-  const normalMap = useMemo(() => {
-    if (typeof document === 'undefined') return null;
-    return createPlasticNormalMap();
-  }, []);
+  const normalMap = useMemo(() => typeof document !== 'undefined' ? createNormalMap() : null, []);
+  const diffuseMap = useMemo(() => typeof document !== 'undefined' ? createDiffuseMap() : null, []);
+  const roughnessMap = useMemo(() => typeof document !== 'undefined' ? createRoughnessMap() : null, []);
 
-  const roughnessMap = useMemo(() => {
-    if (typeof document === 'undefined') return null;
-    return createRoughnessMap();
-  }, []);
+  // Geometry: CylinderGeometry base, modified for silobolsa shape
+  // CylinderGeometry is along Y-axis, we rotate the mesh to lay along Z
+  const geometry = useMemo(() => createSilobolsaGeometry(5.0, 0.55, 64, 128, 42), []);
 
-  // Geometry
-  const geometry = useMemo(() => {
-    return createSilobolsaGeometry(5.0, 0.55, 32, 64, 42);
-  }, []);
-
+  // Store original positions for animation
   useEffect(() => {
     if (geometry) {
-      const posAttr = geometry.getAttribute('position') as THREE.BufferAttribute;
-      originalPositions.current = new Float32Array(posAttr.array);
+      const p = geometry.getAttribute('position') as THREE.BufferAttribute;
+      origPositions.current = new Float32Array(p.array);
     }
   }, [geometry]);
 
@@ -403,106 +406,109 @@ function RealisticSilobolsa() {
     if (!groupRef.current || !meshRef.current) return;
     const t = state.clock.elapsedTime;
 
-    // Scroll rotation
-    const targetRotY = scrollProgress * Math.PI * 2;
-    const targetRotX = Math.sin(scrollProgress * Math.PI) * 0.3;
-    groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetRotY, 0.04);
-    groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetRotX, 0.04);
-    groupRef.current.position.y = Math.sin(t * 0.5) * 0.08;
+    // Scroll Parallax and Subtle floating
+    const parallaxY = Math.sin(scrollProgress * Math.PI) * 0.8 - 0.4;
+    groupRef.current.position.y = Math.sin(t * 0.5) * 0.06 + parallaxY;
+    groupRef.current.rotation.x = 0.1 + (scrollProgress - 0.5) * 0.2; // Slight tilt
+    groupRef.current.rotation.z = (scrollProgress - 0.5) * 0.1;
 
-    // Vertex breathing + wind
-    if (originalPositions.current && meshRef.current.geometry) {
+    // Subtle vertex breathing + wind
+    if (origPositions.current && meshRef.current.geometry) {
       const posAttr = meshRef.current.geometry.getAttribute('position') as THREE.BufferAttribute;
-      const orig = originalPositions.current;
+      const orig = origPositions.current;
 
       for (let i = 0; i < posAttr.count; i++) {
         const ox = orig[i * 3];
-        const oy = orig[i * 3 + 1];
+        const oy = orig[i * 3 + 1]; // Y = length axis
         const oz = orig[i * 3 + 2];
 
-        const breathe = Math.sin(t * 1.2 + oz * 0.8) * 0.005;
-        const wind = Math.sin(t * 2.5 + oz * 3.0 + ox * 2.0) * 0.003;
+        // Radial distance in XZ plane (CylinderGeometry is Y-up)
+        const dist = Math.sqrt(ox * ox + oz * oz);
 
-        const r = Math.sqrt(ox * ox + oy * oy);
-        if (r > 0.02) {
-          const s = 1 + (breathe + wind) / r;
+        // Only animate body vertices, not caps or near-center
+        if (dist > 0.08) {
+          const breathe = Math.sin(t * 1.0 + oy * 0.6) * 0.004;
+          const wind = Math.sin(t * 2.0 + oy * 2.5 + ox * 1.5) * 0.003;
+          const s = 1 + (breathe + wind) / dist;
           posAttr.setX(i, ox * s);
-          posAttr.setY(i, oy * s);
+          posAttr.setZ(i, oz * s);
         }
-        posAttr.setZ(i, oz);
       }
       posAttr.needsUpdate = true;
     }
   });
 
-  const scale = scrollProgress > 0.1 ? 1.8 + scrollProgress * 0.5 : 1.5;
-  const zPos = scrollProgress > 0.1 ? 1.5 : 0;
+  const scale = 1.6;
+  const showHUD = true;
 
   return (
-    <group ref={groupRef} scale={scale} position={[0, 0, zPos]} rotation={[0, Math.PI / 6, 0]}>
-      {/* Main body with textures */}
-      <mesh ref={meshRef} geometry={geometry} castShadow receiveShadow>
+    <group
+      ref={groupRef}
+      scale={scale}
+      position={[0, -0.2, 0]}
+      rotation={[0.1, Math.PI / 5, 0]}
+    >
+      {/* Main silobolsa body — rotated to lay along Z axis */}
+      <mesh ref={meshRef} geometry={geometry} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
         <meshPhysicalMaterial
-          color="#d5d0c8"
-          roughness={0.72}
-          metalness={0.0}
-          clearcoat={0.06}
-          clearcoatRoughness={0.9}
-          envMapIntensity={0.4}
-          emissive="#6b9880"
-          emissiveIntensity={0.12}
-          side={THREE.DoubleSide}
+          map={diffuseMap}
           normalMap={normalMap}
-          normalScale={new THREE.Vector2(0.5, 0.5)}
+          normalScale={new THREE.Vector2(0.6, 0.6)}
           roughnessMap={roughnessMap}
+          roughness={0.75}
+          metalness={0.0}
+          clearcoat={0.04}
+          clearcoatRoughness={0.95}
+          envMapIntensity={0.35}
+          emissive="#7aa88a"
+          emissiveIntensity={0.1}
+          side={THREE.DoubleSide}
         />
       </mesh>
 
       {/* Inner grain glow */}
-      <mesh geometry={geometry} scale={0.93}>
+      <mesh geometry={geometry} rotation={[0, 0, Math.PI / 2]} scale={0.94}>
         <meshStandardMaterial
-          color="#b8922e"
+          color="#b0882a"
           roughness={1}
           metalness={0}
           transparent
-          opacity={0.1}
+          opacity={0.08}
           side={THREE.BackSide}
         />
+      </mesh>
+
+      {/* Ropes at ends */}
+      <mesh position={[-2.45, 0, 0]} rotation={[0, Math.PI/2, 0]}>
+        <torusGeometry args={[0.08, 0.015, 8, 24]} />
+        <meshStandardMaterial color="#333" roughness={0.9} />
+      </mesh>
+      <mesh position={[2.45, 0, 0]} rotation={[0, Math.PI/2, 0]}>
+        <torusGeometry args={[0.08, 0.015, 8, 24]} />
+        <meshStandardMaterial color="#333" roughness={0.9} />
       </mesh>
 
       {/* Top seam */}
       <SeamLine length={5.0} />
 
-      {/* Sensor HUDs with connector lines */}
+      {/* Sensor HUDs */}
       <SensorHUD
-        anchorPos={[0.3, 0.45, -0.8]}
-        position={[1.1, 1.0, -1.0]}
-        label="Humedad"
-        value={liveData.hum}
-        unit="%"
-        color="#ef4444"
-        icon="💧"
-        scrollProgress={scrollProgress}
+        anchorPos={[-1.2, 0.5, 0.1]}
+        position={[-1.5, 1.2, 0.5]}
+        label="Humedad" value={liveData.hum} unit="%" color="#ef4444" icon="💧"
+        visible={showHUD}
       />
       <SensorHUD
-        anchorPos={[-0.35, 0.3, 0.2]}
-        position={[-1.2, 0.85, 0.2]}
-        label="CO₂"
-        value={liveData.co2}
-        unit="ppm"
-        color="#f59e0b"
-        icon="🌫️"
-        scrollProgress={scrollProgress}
+        anchorPos={[0.1, 0.55, -0.1]}
+        position={[0.0, 1.3, -0.5]}
+        label="CO₂" value={liveData.co2} unit="ppm" color="#f59e0b" icon="🌫️"
+        visible={showHUD}
       />
       <SensorHUD
-        anchorPos={[0.25, 0.4, 1.3]}
-        position={[1.1, 0.95, 1.5]}
-        label="Temp"
-        value={liveData.temp}
-        unit="°C"
-        color="#10b981"
-        icon="🌡️"
-        scrollProgress={scrollProgress}
+        anchorPos={[1.3, 0.45, 0.2]}
+        position={[1.5, 1.1, 0.5]}
+        label="Temp" value={liveData.temp} unit="°C" color="#10b981" icon="🌡️"
+        visible={showHUD}
       />
     </group>
   );
@@ -510,57 +516,40 @@ function RealisticSilobolsa() {
 
 // ─── Seam line ──────────────────────────────────────────────────────
 function SeamLine({ length }: { length: number }) {
-  const points = useMemo(() => {
-    const pts: [number, number, number][] = [];
-    const segments = 60;
-    const halfLen = length / 2;
-    for (let i = 0; i <= segments; i++) {
-      const t = i / segments;
-      const z = -halfLen + t * length;
-      // Only draw seam in the non-tapered section
-      const endT = 0.13;
+  const pts = useMemo(() => {
+    const out: [number, number, number][] = [];
+    const n = 50;
+    const h = length / 2;
+    const endT = 0.14;
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
       if (t < endT || t > 1 - endT) continue;
-      const y = 0.56 + Math.sin(t * Math.PI * 6) * 0.004;
-      const x = Math.sin(t * Math.PI * 10) * 0.002;
-      pts.push([x, y, z]);
+      const z = -h + t * length;
+      out.push([
+        Math.sin(t * Math.PI * 10) * 0.002,
+        0.56 + Math.sin(t * Math.PI * 6) * 0.003,
+        z,
+      ]);
     }
-    return pts;
+    return out;
   }, [length]);
 
-  if (points.length < 2) return null;
-
-  return (
-    <Line
-      points={points}
-      color="#aaaaaa"
-      transparent
-      opacity={0.35}
-      lineWidth={1.5}
-    />
-  );
-}
-
-// ─── Ground ─────────────────────────────────────────────────────────
-function GroundPlane() {
-  return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.65, 0]} receiveShadow>
-      <planeGeometry args={[20, 20]} />
-      <meshStandardMaterial color="#1a1a1a" roughness={1} metalness={0} transparent opacity={0.3} />
-    </mesh>
-  );
+  if (pts.length < 2) return null;
+  return <Line points={pts} color="#aaa" transparent opacity={0.3} lineWidth={1.5} />;
 }
 
 // ─── Data Particles ─────────────────────────────────────────────────
 function DataParticles() {
   const ref = useRef<THREE.Points>(null);
+  // Use count divisible by 3 to avoid partial point data
   const [sphere] = useState(
-    () => random.inSphere(new Float32Array(5000), { radius: 10 }) as Float32Array
+    () => random.inSphere(new Float32Array(4998), { radius: 10 }) as Float32Array
   );
 
-  useFrame((_state, delta) => {
+  useFrame((_, dt) => {
     if (ref.current) {
-      ref.current.rotation.x -= delta / 15;
-      ref.current.rotation.y -= delta / 20;
+      ref.current.rotation.x -= dt / 15;
+      ref.current.rotation.y -= dt / 20;
     }
   });
 
@@ -573,10 +562,13 @@ function DataParticles() {
   );
 }
 
-// ─── Main Scene ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════
+// SCENE
+// ═══════════════════════════════════════════════════════════════════════
+
 export function Scene3D() {
   return (
-    <div className="fixed inset-0 z-0 pointer-events-none mix-blend-screen bg-black">
+    <div className="absolute inset-0 z-0 pointer-events-none mix-blend-screen bg-black">
       <Canvas
         camera={{ position: [0, 1.5, 7], fov: 40 }}
         shadows="basic"
@@ -586,17 +578,12 @@ export function Scene3D() {
         <fog attach="fog" args={['#000', 6, 18]} />
 
         <directionalLight
-          position={[8, 12, 6]}
-          intensity={2.5}
-          color="#fff5e6"
+          position={[8, 12, 6]} intensity={2.5} color="#fff5e6"
           castShadow
-          shadow-mapSize-width={1024}
-          shadow-mapSize-height={1024}
+          shadow-mapSize-width={1024} shadow-mapSize-height={1024}
           shadow-camera-far={30}
-          shadow-camera-left={-5}
-          shadow-camera-right={5}
-          shadow-camera-top={5}
-          shadow-camera-bottom={-5}
+          shadow-camera-left={-5} shadow-camera-right={5}
+          shadow-camera-top={5} shadow-camera-bottom={-5}
           shadow-bias={-0.001}
         />
         <directionalLight position={[-6, 4, -4]} intensity={0.6} color="#b0c4de" />
@@ -606,9 +593,8 @@ export function Scene3D() {
 
         <RealisticSilobolsa />
         <DataParticles />
-        <GroundPlane />
 
-        <ContactShadows position={[0, -0.64, 0]} opacity={0.4} scale={12} blur={2.5} far={4} color="#000000" />
+        <ContactShadows position={[0, -0.64, 0]} opacity={0.4} scale={12} blur={2.5} far={4} color="#000" />
         <Environment preset="sunset" environmentIntensity={0.3} />
       </Canvas>
 

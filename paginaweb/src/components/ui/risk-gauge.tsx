@@ -68,7 +68,7 @@ export default function RiskGauge({
         <path
           d={arcPath}
           fill="none"
-          stroke="var(--border-default)"
+          stroke="rgba(255,255,255,0.1)"
           strokeWidth={cfg.strokeWidth}
           strokeLinecap="round"
         />
@@ -136,7 +136,7 @@ export default function RiskGauge({
           x={cx}
           y={cy - (size === 'sm' ? 2 : size === 'md' ? 4 : 8)}
           textAnchor="middle"
-          fill="var(--text-muted)"
+          fill="rgba(161,161,170,0.5)"
           fontSize={size === 'sm' ? 9 : size === 'md' ? 12 : 14}
         >
           / 100

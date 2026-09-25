@@ -1,0 +1,83 @@
+// ===========================================================================
+// AGRILION — Firestore Security Rules
+// ===========================================================================
+// Subir estas reglas desde Firebase Console → Firestore Database → Rules
+// Documentación: https://firebase.google.com/docs/firestore/security/get-started
+// ===========================================================================
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper functions ──────────────────────────────────────────────────
+
+    // Usuario autenticado
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // El usuario autenticado es el dueño del recurso
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Datos mínimos del request (evita requests vacíos o maliciosos)
+    function hasValidUserData() {
+      return request.resource.data.keys().hasAll(['email', 'createdAt']);
+    }
+
+    // ─── Users collection ──────────────────────────────────────────────────
+    // Ruta: /users/{uid}
+    // Solo el dueño puede leer/escribir su propio perfil
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && hasValidUserData();
+      allow update: if isOwner(uid)
+                    && request.resource.data.keys().hasAny(['name', 'phone', 'company']);
+      allow delete: if false;  // No permitimos borrar usuarios
+
+      // ─── Silos subcollection ─────────────────────────────────────────────
+      // Ruta: /users/{uid}/silos/{siloId}
+      match /silos/{siloId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+                      && request.resource.data.keys().hasAll(['name', 'grainType', 'ownerId']);
+        allow update: if isOwner(uid);
+        allow delete: if isOwner(uid);
+
+        // ─── Sensors subcollection ───────────────────────────────────────
+        // Ruta: /users/{uid}/silos/{siloId}/sensors/{sensorId}
+        match /sensors/{sensorId} {
+          allow read: if isOwner(uid);
+          allow create, update: if isOwner(uid);
+          allow delete: if isOwner(uid);
+        }
+      }
+
+      // ─── Alerts subcollection ────────────────────────────────────────────
+      // Ruta: /users/{uid}/alerts/{alertId}
+      match /alerts/{alertId} {
+        allow read: if isOwner(uid);
+        allow create: if false;  // Solo el backend puede crear alertas (usando Admin SDK)
+        allow update: if isOwner(uid)
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['acknowledged']);
+        allow delete: if isOwner(uid);
+      }
+    }
+
+    // ─── Sensors global collection (lookup rápido por device_id) ───────────
+    // Ruta: /sensors/{deviceId}
+    // Solo el dueño del sensor puede leer; solo Admin SDK puede escribir
+    match /sensors/{deviceId} {
+      allow read: if isSignedIn()
+                  && resource.data.ownerUid == request.auth.uid;
+      allow write: if false;  // Solo backend con Admin SDK (MQTT_INFLUXDB_FIREBASE.py)
+    }
+
+    // ─── Default: deny everything else ─────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

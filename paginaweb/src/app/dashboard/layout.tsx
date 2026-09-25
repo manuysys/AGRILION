@@ -4,6 +4,7 @@ import BottomNav from '@/components/layout/bottom-nav';
 import DashboardHeader from '@/components/layout/dashboard-header';
 import { fetchDashboardStats } from '@/lib/data-service';
 import { formatRelativeTime } from '@/lib/formatters';
+import PageTransition from '@/components/ui/page-transition';
 
 export const metadata: Metadata = {
   title: 'Dashboard | Agrilion+',
@@ -15,7 +16,23 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const stats = await fetchDashboardStats();
+  // Fetch stats con fallback seguro (si falla, usar defaults)
+  let stats;
+  try {
+    stats = await fetchDashboardStats();
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error);
+    stats = {
+      totalSilos: 0,
+      activeSensors: 0,
+      totalSensors: 0,
+      activeAlerts: 0,
+      criticalAlerts: 0,
+      averageBattery: 0,
+      lastGlobalUpdate: new Date().toISOString(),
+      systemHealth: 'ok' as const,
+    };
+  }
 
   return (
     <div className="flex min-h-screen bg-black text-white selection:bg-emerald-500/30">
@@ -28,8 +45,10 @@ export default async function DashboardLayout({
           activeAlerts={stats.activeAlerts}
         />
 
-        <main className="flex-1 pb-20 lg:pb-6">
-          {children}
+        <main className="flex-1 pb-20 lg:pb-6 relative">
+          <PageTransition>
+            {children}
+          </PageTransition>
         </main>
       </div>
 

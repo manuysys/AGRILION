@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { SiloBag } from '@/types';
 import SiloCard from '@/components/ui/silo-card';
-import { ListOrdered, ShieldAlert, CheckCircle2, Layers } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface RiskRankingProps {

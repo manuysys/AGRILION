@@ -15,10 +15,16 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
+const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://agrilion.com';
+
 export const metadata: Metadata = {
-  title: "Agrilion+ | Monitoreo Inteligente de Silobolsas",
+  metadataBase: new URL(baseUrl),
+  title: {
+    default: "Agrilion+ | Monitoreo Inteligente de Silobolsas",
+    template: "%s | Agrilion+",
+  },
   description:
-    "Sistema IoT para monitoreo en tiempo real de granos almacenados en silobolsas. Detectá deterioro antes de que ocurran pérdidas.",
+    "Sistema IoT para monitoreo en tiempo real de granos almacenados en silobolsas. Detectá deterioro antes de que ocurran pérdidas con sensores inteligentes y predicción por IA.",
   keywords: [
     "agrilion",
     "silobolsa",
@@ -28,7 +34,63 @@ export const metadata: Metadata = {
     "agricultura",
     "sensores",
     "alertas",
+    "inteligencia artificial",
+    "LoRaWAN",
+    "agro",
+    "campo",
+    "acopio",
+    "agtech",
   ],
+  authors: [{ name: 'Agrilion Team' }],
+  creator: 'Agrilion',
+  publisher: 'Agrilion',
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'es_AR',
+    url: baseUrl,
+    siteName: 'Agrilion+',
+    title: 'Agrilion+ | Monitoreo Inteligente de Silobolsas',
+    description: 'Sistema IoT para monitoreo en tiempo real de granos almacenados. Detectá deterioro antes de que ocurran pérdidas.',
+    images: [
+      {
+        url: '/api/og',
+        width: 1200,
+        height: 630,
+        alt: 'Agrilion+ Dashboard',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Agrilion+ | Monitoreo Inteligente de Silobolsas',
+    description: 'Sistema IoT para monitoreo en tiempo real de granos almacenados. Detectá deterioro antes de que ocurran pérdidas.',
+    images: ['/api/og'],
+    creator: '@agrilion',
+  },
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
+  manifest: '/site.webmanifest',
+  alternates: {
+    canonical: baseUrl,
+    languages: {
+      'es-AR': baseUrl,
+    },
+  },
+  category: 'technology',
 };
 
 import { SmoothScroll } from '@/components/ui/smooth-scroll';
@@ -39,7 +101,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className={`${inter.variable} ${geistMono.variable}`}>
+    <html lang="es" className={`${inter.variable} ${geistMono.variable}`} suppressHydrationWarning>
       <body className="min-h-screen bg-surface-0 text-foreground antialiased">
         <SmoothScroll>
           {children}

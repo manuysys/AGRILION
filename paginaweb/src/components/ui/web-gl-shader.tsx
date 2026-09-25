@@ -3,6 +3,15 @@
 import { useEffect, useRef } from "react"
 import * as THREE from "three"
 
+interface ShaderUniforms {
+  [uniform: string]: { value: number[] | number }
+  resolution: { value: number[] }
+  time: { value: number }
+  xScale: { value: number }
+  yScale: { value: number }
+  distortion: { value: number }
+}
+
 export function WebGLShader() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<{
@@ -10,7 +19,7 @@ export function WebGLShader() {
     camera: THREE.OrthographicCamera | null
     renderer: THREE.WebGLRenderer | null
     mesh: THREE.Mesh | null
-    uniforms: any
+    uniforms: ShaderUniforms | null
     animationId: number | null
   }>({
     scene: null,
@@ -75,13 +84,14 @@ export function WebGLShader() {
 
       refs.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, -1)
 
-      refs.uniforms = {
+      const uniforms: ShaderUniforms = {
         resolution: { value: [window.innerWidth, window.innerHeight] },
         time: { value: 0.0 },
         xScale: { value: 2.2 },
         yScale: { value: 0.35 },
         distortion: { value: 0.08 },
       }
+      refs.uniforms = uniforms
 
       const position = [
         -1.0, -1.0, 0.0,

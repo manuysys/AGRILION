@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { Battery, Clock, ChevronRight } from 'lucide-react';
 import type { SiloBag } from '@/types';
 import StatusPill from './status-pill';
-import MetricCard from './metric-card';
 import { formatRelativeTime, formatTemp, formatHumidity, formatCO2, getFreshnessColor } from '@/lib/formatters';
 import { getTemperatureState, getHumidityState, getCO2State, getBatteryState } from '@/lib/thresholds';
 

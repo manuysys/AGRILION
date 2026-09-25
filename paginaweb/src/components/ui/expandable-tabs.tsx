@@ -55,7 +55,6 @@ export function ExpandableTabs({
   onChange,
 }: ExpandableTabsProps) {
   const [selected, setSelected] = React.useState<number | null>(null);
-  const [hovered, setHovered] = React.useState<number | null>(null);
   const outsideClickRef = React.useRef<HTMLDivElement>(null);
 
   useOnClickOutside(outsideClickRef as React.RefObject<HTMLElement>, () => {

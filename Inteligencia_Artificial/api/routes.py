@@ -33,6 +33,10 @@ from .schemas import (
     IngestResponse,
     ChatRequest,
     ChatResponse,
+    SiloOverviewItem,
+    SilosOverviewResponse,
+    SiloHistoryItem,
+    SiloHistoryResponse,
 )
 
 import sys
@@ -47,6 +51,8 @@ from src.risk_engine import RiskEngine
 from src.alerts import AlertSystem
 from src.services.ai_service import AIService, InMemoryRepository, SensorReading as AISensorReading
 from src.chatbot import ChatbotService, LLMConfig, FallbackClient
+from src.services.influx_repository import create_repository_from_env, InfluxRepository
+from src.services.firebase_service import get_firebase_service
 
 logger = logging.getLogger(__name__)
 
@@ -63,13 +69,16 @@ _risk_engine = RiskEngine()
 _alert_system = AlertSystem()
 _anomaly_detector = AnomalyDetector()
 _ai_service: Optional[AIService] = None
-_repository = InMemoryRepository()
 _chatbot: Optional[ChatbotService] = None
+
+# Repository: intenta InfluxDB primero, fallback a InMemory
+_influx_repo: Optional[InfluxRepository] = None
+_repository = None  # Se setea en initialize_model()
 
 
 def initialize_model():
-    """Carga el modelo y scaler si existen."""
-    global _model, _preprocessor, _predictor
+    """Carga el modelo y scaler si existen. Inicializa repositorio y chatbot."""
+    global _model, _preprocessor, _predictor, _repository, _influx_repo
 
     _preprocessor = DataPreprocessor()
 
@@ -86,7 +95,20 @@ def initialize_model():
     else:
         logger.info("ℹ️ Modelo no encontrado. Entrene el modelo primero con main.py")
 
-    # Inicializar AI Service
+    # ─── Inicializar Repository (InfluxDB → fallback → InMemory) ─────────
+    try:
+        _influx_repo = create_repository_from_env()
+        if _influx_repo is not None:
+            _repository = _influx_repo
+            logger.info("📊 Repository: InfluxDB (datos reales)")
+        else:
+            _repository = InMemoryRepository()
+            logger.info("💾 Repository: InMemory (modo simulación)")
+    except Exception as e:
+        logger.warning(f"⚠️ InfluxDB falló: {e}. Usando InMemory.")
+        _repository = InMemoryRepository()
+
+    # ─── Inicializar AI Service ───────────────────────────────────────────
     global _ai_service
     if _model is not None:
         _ai_service = AIService(
@@ -99,7 +121,7 @@ def initialize_model():
         )
         logger.info("✅ AI Service inicializado para API")
 
-    # Inicializar Chatbot Service
+    # ─── Inicializar Chatbot Service ─────────────────────────────────────
     global _chatbot
     try:
         _chatbot = ChatbotService(ai_service=_ai_service, risk_engine=_risk_engine)
@@ -443,3 +465,330 @@ async def clear_chat_session(session_id: str):
     if _chatbot:
         _chatbot.clear_session(session_id)
     return {"status": "cleared", "session_id": session_id}
+
+
+# ===========================================================================
+# FRONTEND DATA ENDPOINTS (silos overview, history, current)
+# ===========================================================================
+
+
+@router.get("/silos/overview", response_model=SilosOverviewResponse, tags=["Datos"])
+async def get_silos_overview():
+    """
+    Devuelve el estado actual de todos los silos.
+
+    Usa datos reales de InfluxDB si está configurado, o
+    datos del InMemoryRepository si no.
+    """
+    if _influx_repo is not None:
+        raw = _influx_repo.get_silo_overview()
+    elif _repository is not None and hasattr(_repository, "get_silo_overview"):
+        raw = _repository.get_silo_overview()
+    else:
+        # Fallback: generar datos de prueba
+        raw = _generate_mock_overview()
+
+    silos = [
+        SiloOverviewItem(
+            silo_id=s["silo_id"],
+            temperature=float(s["temperature"]),
+            humidity=float(s["humidity"]),
+            co2=float(s["co2"]),
+            risk_score=int(s["risk_score"]),
+            risk_level=s["risk_level"],
+            last_update=s["last_update"],
+        )
+        for s in raw
+    ]
+
+    return SilosOverviewResponse(
+        silos=silos,
+        total=len(silos),
+        timestamp=datetime.now().isoformat(),
+    )
+
+
+@router.get(
+    "/silos/{silo_id}/history",
+    response_model=SiloHistoryResponse,
+    tags=["Datos"],
+)
+async def get_silo_history(silo_id: str, hours: int = 24):
+    """
+    Devuelve el historial de un silo en las últimas N horas.
+    """
+    if _influx_repo is not None:
+        raw = _influx_repo.get_silo_history(silo_id, hours)
+    elif _repository is not None and hasattr(_repository, "get_recent_readings"):
+        df = _repository.get_recent_readings(silo_id, n=hours * 4)
+        raw = [
+            {
+                "timestamp": str(ts),
+                "temperature": float(row.get("temperature", 0)),
+                "humidity": float(row.get("humidity", 0)),
+                "co2": float(row.get("co2", 0)),
+            }
+            for ts, row in df.iterrows()
+        ] if not df.empty else []
+    else:
+        raw = []
+
+    history = [
+        SiloHistoryItem(
+            timestamp=h["timestamp"],
+            temperature=float(h["temperature"]),
+            humidity=float(h["humidity"]),
+            co2=float(h["co2"]),
+        )
+        for h in raw
+    ]
+
+    return SiloHistoryResponse(
+        silo_id=silo_id,
+        history=history,
+        hours=hours,
+        total_points=len(history),
+    )
+
+
+@router.get("/silos/{silo_id}/current", tags=["Datos"])
+async def get_silo_current(silo_id: str):
+    """
+    Devuelve el estado actual de un silo específico.
+    """
+    if _influx_repo is not None:
+        all_silos = _influx_repo.get_silo_overview()
+        for s in all_silos:
+            if s["silo_id"] == silo_id:
+                return s
+    elif _repository is not None:
+        df = _repository.get_recent_readings(silo_id, n=1)
+        if not df.empty:
+            last = df.iloc[-1]
+            return {
+                "silo_id": silo_id,
+                "temperature": round(float(last.get("temperature", 0)), 1),
+                "humidity": round(float(last.get("humidity", 0)), 1),
+                "co2": round(float(last.get("co2", 0)), 1),
+                "risk_score": 0,
+                "risk_level": "NORMAL",
+                "last_update": str(df.index[-1]),
+            }
+
+    raise HTTPException(status_code=404, detail=f"Silo {silo_id} no encontrado")
+
+
+# ===========================================================================
+# AUTH ENDPOINTS (Firebase Authentication + Firestore)
+# ===========================================================================
+
+@router.post("/auth/register", tags=["Auth"])
+async def register_user(request: dict):
+    """
+    Registra un nuevo usuario.
+    
+    Request body:
+        {
+            "email": "user@example.com",
+            "password": "securepass123",
+            "name": "Juan Pérez",
+            "phone": "+5491123456789",  // opcional
+            "company": "Agrícola SRL"    // opcional
+        }
+    """
+    fb = get_firebase_service()
+    if not fb:
+        raise HTTPException(status_code=503, detail="Firebase no disponible")
+    
+    try:
+        user = fb.register_user(
+            email=request["email"],
+            password=request["password"],
+            name=request.get("name", ""),
+            phone=request.get("phone", ""),
+            company=request.get("company", ""),
+        )
+        return {"status": "ok", "user": user}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/auth/verify", tags=["Auth"])
+async def verify_token(request: dict):
+    """
+    Verifica un Firebase ID token y devuelve la info del usuario.
+    
+    Request body:
+        {
+            "idToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+        }
+    """
+    fb = get_firebase_service()
+    if not fb:
+        raise HTTPException(status_code=503, detail="Firebase no disponible")
+    
+    try:
+        decoded = fb.verify_id_token(request["idToken"])
+        uid = decoded["uid"]
+        profile = fb.get_user_profile(uid)
+        return {
+            "status": "ok",
+            "uid": uid,
+            "email": decoded.get("email"),
+            "profile": profile,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Token inválido: {e}")
+
+
+@router.get("/users/{uid}/silos", tags=["Silos"])
+async def get_user_silos(uid: str):
+    """Devuelve todos los silos de un usuario."""
+    fb = get_firebase_service()
+    if not fb:
+        raise HTTPException(status_code=503, detail="Firebase no disponible")
+    
+    silos = fb.get_user_silos(uid)
+    return {"status": "ok", "silos": silos, "total": len(silos)}
+
+
+@router.post("/users/{uid}/silos", tags=["Silos"])
+async def create_silo(uid: str, request: dict):
+    """
+    Crea una nueva silobolsa para un usuario.
+    
+    Request body:
+        {
+            "name": "Silo Norte",
+            "grain_type": "soja",
+            "location": "Lote 5 - Campo San Martín",
+            "tons": 120.5
+        }
+    """
+    fb = get_firebase_service()
+    if not fb:
+        raise HTTPException(status_code=503, detail="Firebase no disponible")
+    
+    try:
+        silo_id = fb.create_silo(
+            owner_uid=uid,
+            name=request["name"],
+            grain_type=request["grain_type"],
+            location=request.get("location", ""),
+            tons=request.get("tons", 0),
+        )
+        return {"status": "ok", "silo_id": silo_id}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/users/{uid}/silos/{silo_id}", tags=["Silos"])
+async def get_silo(uid: str, silo_id: str):
+    """Devuelve un silo específico con sus sensores."""
+    fb = get_firebase_service()
+    if not fb:
+        raise HTTPException(status_code=503, detail="Firebase no disponible")
+    
+    silo = fb.get_silo(uid, silo_id)
+    if not silo:
+        raise HTTPException(status_code=404, detail="Silo no encontrado")
+    
+    return {"status": "ok", "silo": silo}
+
+
+@router.post("/users/{uid}/silos/{silo_id}/sensors", tags=["Sensores"])
+async def register_sensor(uid: str, silo_id: str, request: dict):
+    """
+    Registra un sensor y lo asocia a un silo.
+    
+    Request body:
+        {
+            "device_id": "cubecell-001",
+            "battery": 95
+        }
+    """
+    fb = get_firebase_service()
+    if not fb:
+        raise HTTPException(status_code=503, detail="Firebase no disponible")
+    
+    try:
+        sensor_id = fb.register_sensor(
+            owner_uid=uid,
+            silo_id=silo_id,
+            device_id=request["device_id"],
+            battery=request.get("battery", 100),
+        )
+        return {"status": "ok", "sensor_id": sensor_id}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/sensors/{device_id}", tags=["Sensores"])
+async def get_sensor_info(device_id: str):
+    """Obtiene info de un sensor por device_id (lookup global)."""
+    fb = get_firebase_service()
+    if not fb:
+        raise HTTPException(status_code=503, detail="Firebase no disponible")
+    
+    info = fb.get_sensor_info(device_id)
+    if not info:
+        raise HTTPException(status_code=404, detail="Sensor no encontrado")
+    
+    return {"status": "ok", "sensor": info}
+
+
+@router.get("/users/{uid}/alerts", tags=["Alertas"])
+async def get_user_alerts(uid: str, acknowledged: bool = None):
+    """Devuelve las alertas de un usuario."""
+    fb = get_firebase_service()
+    if not fb:
+        raise HTTPException(status_code=503, detail="Firebase no disponible")
+    
+    alerts = fb.get_user_alerts(uid, acknowledged=acknowledged)
+    return {"status": "ok", "alerts": alerts, "total": len(alerts)}
+
+
+@router.post("/users/{uid}/alerts/{alert_id}/acknowledge", tags=["Alertas"])
+async def acknowledge_alert(uid: str, alert_id: str):
+    """Marca una alerta como reconocida."""
+    fb = get_firebase_service()
+    if not fb:
+        raise HTTPException(status_code=503, detail="Firebase no disponible")
+    
+    fb.acknowledge_alert(uid, alert_id)
+    return {"status": "ok"}
+
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+
+def _generate_mock_overview() -> list[dict]:
+    """Generar datos mock cuando no hay repositorio configurado."""
+    import random
+    now = datetime.now().isoformat()
+    silos = []
+    for i in range(1, 6):
+        sid = f"SILO_{i:03d}"
+        temp = round(random.uniform(18, 32), 1)
+        hum = round(random.uniform(50, 85), 1)
+        co2 = round(random.uniform(400, 1000), 0)
+        # Score simple
+        score = 0
+        if temp > 30:
+            score += 20
+        if hum > 75:
+            score += 25
+        if co2 > 800:
+            score += 25
+        score = min(score, 100)
+        level = "CRITICAL" if score >= 70 else ("WARNING" if score >= 30 else "NORMAL")
+        silos.append({
+            "silo_id": sid,
+            "temperature": temp,
+            "humidity": hum,
+            "co2": co2,
+            "risk_score": score,
+            "risk_level": level,
+            "last_update": now,
+        })
+    return silos

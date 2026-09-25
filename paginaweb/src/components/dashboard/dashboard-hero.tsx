@@ -5,8 +5,11 @@ import { motion } from 'framer-motion';
 import { ArrowRight, AlertCircle, ShieldCheck, AlertTriangle } from 'lucide-react';
 import type { SiloBag } from '@/types';
 import { formatTemp, formatHumidity } from '@/lib/formatters';
-import { WebGLShader } from '@/components/ui/web-gl-shader';
+import dynamic from 'next/dynamic';
 import { LiquidButton } from '@/components/ui/liquid-glass-button';
+
+// Heavy 3D shader background — loaded dynamically to avoid bundling three.js on initial load
+const WebGLShader = dynamic(() => import('@/components/ui/web-gl-shader').then(m => m.WebGLShader), { ssr: false });
 
 interface DashboardHeroProps {
   systemState: 'ok' | 'warn' | 'critical';

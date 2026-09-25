@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useSyncExternalStore } from 'react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -55,11 +56,11 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="glass rounded-lg px-3 py-2 shadow-lg border border-[var(--border-default)]">
-      <p className="text-xs text-[var(--text-muted)] font-data mb-1">
+    <div className="glass-dark rounded-lg px-3 py-2 shadow-lg border border-white/10">
+      <p className="text-xs text-zinc-500 font-data mb-1">
         {label}
       </p>
-      <p className="text-sm font-semibold font-data text-[var(--text-primary)]">
+      <p className="text-sm font-semibold font-data text-white">
         {payload[0].value}
       </p>
     </div>
@@ -75,6 +76,13 @@ export default function TimelineChart({
   simplified = false,
   className = '',
 }: TimelineChartProps) {
+  // Client-only render guard for Recharts (avoids SSR hydration mismatch)
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+
   const cfg = metricConfig[metric];
   const warnThreshold = thresholds?.warn ?? cfg.warnDefault;
   const critThreshold = thresholds?.critical ?? cfg.critDefault;
@@ -91,35 +99,37 @@ export default function TimelineChart({
   if (simplified) {
     // Simple line for mobile / compact views
     return (
-      <div className={className}>
-        <ResponsiveContainer width="100%" height={height}>
-          <LineChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
-            <Line
-              type="monotone"
-              dataKey="value"
-              stroke={cfg.color}
-              strokeWidth={2}
-              dot={false}
-            />
-            <ReferenceLine
-              y={warnThreshold}
-              stroke="var(--state-warn)"
-              strokeDasharray="4 4"
-              strokeWidth={1}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+      <div className={className} style={{ minHeight: height, width: '100%' }}>
+        {mounted && (
+          <ResponsiveContainer width="100%" height={height} minWidth={1} minHeight={1}>
+            <LineChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke={cfg.color}
+                strokeWidth={2}
+                dot={false}
+              />
+              <ReferenceLine
+                y={warnThreshold}
+                stroke="var(--state-warn)"
+                strokeDasharray="4 4"
+                strokeWidth={1}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </div>
     );
   }
 
   return (
-    <div className={className}>
+    <div className={className} style={{ minHeight: height + 40, width: '100%' }}>
       <div className="flex items-center justify-between mb-2">
-        <h4 className="text-sm font-medium text-[var(--text-secondary)]">
+        <h4 className="text-sm font-medium text-zinc-400">
           {cfg.label} ({cfg.unit})
         </h4>
-        <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
+        <div className="flex items-center gap-3 text-xs text-zinc-500">
           <span className="flex items-center gap-1">
             <span className="w-2 h-0.5 rounded-full bg-[var(--state-warn)]" />
             Advertencia ({warnThreshold}{cfg.unit})
@@ -131,92 +141,96 @@ export default function TimelineChart({
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={chartData} margin={{ top: 10, right: 10, bottom: 5, left: -10 }}>
-          {showGrid && (
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="var(--border-subtle)"
-              vertical={false}
-            />
-          )}
+      <div style={{ width: '100%', height, minHeight: height }}>
+        {mounted && (
+          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+            <LineChart data={chartData} margin={{ top: 10, right: 10, bottom: 5, left: -10 }}>
+              {showGrid && (
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="rgba(255,255,255,0.05)"
+                  vertical={false}
+                />
+              )}
 
-          <XAxis
-            dataKey="time"
-            tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
-            tickLine={false}
-            axisLine={{ stroke: 'var(--border-default)' }}
-            interval="preserveStartEnd"
-          />
+              <XAxis
+                dataKey="time"
+                tick={{ fontSize: 11, fill: 'rgba(161,161,170,0.8)' }}
+                tickLine={false}
+                axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                interval="preserveStartEnd"
+              />
 
-          <YAxis
-            domain={[minValue, maxValue]}
-            tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
-            tickLine={false}
-            axisLine={false}
-            width={40}
-          />
+              <YAxis
+                domain={[minValue, maxValue]}
+                tick={{ fontSize: 11, fill: 'rgba(161,161,170,0.8)' }}
+                tickLine={false}
+                axisLine={false}
+                width={40}
+              />
 
-          <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip />} />
 
-          {/* Warning zone */}
-          <ReferenceArea
-            y1={warnThreshold}
-            y2={critThreshold}
-            fill="var(--state-warn)"
-            fillOpacity={0.06}
-          />
+              {/* Warning zone */}
+              <ReferenceArea
+                y1={warnThreshold}
+                y2={critThreshold}
+                fill="var(--state-warn)"
+                fillOpacity={0.06}
+              />
 
-          {/* Critical zone */}
-          <ReferenceArea
-            y1={critThreshold}
-            y2={maxValue}
-            fill="var(--state-critical)"
-            fillOpacity={0.06}
-          />
+              {/* Critical zone */}
+              <ReferenceArea
+                y1={critThreshold}
+                y2={maxValue}
+                fill="var(--state-critical)"
+                fillOpacity={0.06}
+              />
 
-          {/* Threshold lines */}
-          <ReferenceLine
-            y={warnThreshold}
-            stroke="var(--state-warn)"
-            strokeDasharray="6 3"
-            strokeWidth={1}
-            label={{
-              value: `${warnThreshold}`,
-              position: 'right',
-              fontSize: 10,
-              fill: 'var(--state-warn)',
-            }}
-          />
-          <ReferenceLine
-            y={critThreshold}
-            stroke="var(--state-critical)"
-            strokeDasharray="6 3"
-            strokeWidth={1}
-            label={{
-              value: `${critThreshold}`,
-              position: 'right',
-              fontSize: 10,
-              fill: 'var(--state-critical)',
-            }}
-          />
+              {/* Threshold lines */}
+              <ReferenceLine
+                y={warnThreshold}
+                stroke="var(--state-warn)"
+                strokeDasharray="6 3"
+                strokeWidth={1}
+                label={{
+                  value: `${warnThreshold}`,
+                  position: 'right',
+                  fontSize: 10,
+                  fill: 'var(--state-warn)',
+                }}
+              />
+              <ReferenceLine
+                y={critThreshold}
+                stroke="var(--state-critical)"
+                strokeDasharray="6 3"
+                strokeWidth={1}
+                label={{
+                  value: `${critThreshold}`,
+                  position: 'right',
+                  fontSize: 10,
+                  fill: 'var(--state-critical)',
+                }}
+              />
 
-          {/* Data line */}
-          <Line
-            type="monotone"
-            dataKey="value"
-            stroke={cfg.color}
-            strokeWidth={2}
-            dot={false}
-            activeDot={{
-              r: 4,
-              strokeWidth: 2,
-              fill: 'white',
-              stroke: cfg.color,
-            }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
+              {/* Data line */}
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke={cfg.color}
+                strokeWidth={2}
+                dot={false}
+                activeDot={{
+                  r: 4,
+                  strokeWidth: 2,
+                  fill: 'white',
+                  stroke: cfg.color,
+                }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
     </div>
   );
 }

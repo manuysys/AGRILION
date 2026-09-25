@@ -1,4 +1,20 @@
 /venv
 .env
 influxd.exe
+
+# Firebase credentials (NUNCA subir secretos)
+firebase/serviceAccountKey.json
+firebase/*.json
 serviceAccountKey.json
+
+# Secrets / datos locales (NUNCA subir)
+*TOKEN*.txt
+APIToken*.txt
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.pyc
+*.pyo

@@ -144,3 +144,64 @@ class IngestResponse(BaseModel):
     anomalies: dict
     alerts: list
     metadata: dict
+
+
+# =============================================================================
+# CHATBOT SCHEMAS
+# =============================================================================
+
+
+class ChatRequest(BaseModel):
+    """Request para el chatbot de IA."""
+    message: str = Field(..., min_length=1, description="Pregunta del usuario")
+    silo_id: str = Field(default="SILO_001", description="ID del silo para contexto")
+    session_id: str = Field(default="default", description="ID de sesión para mantener conversación")
+
+
+class ChatResponse(BaseModel):
+    """Response del chatbot de IA."""
+    response: str
+    session_id: str
+    latency_ms: float
+    context_used: dict = {}
+    error: Optional[str] = None
+    from_cache: bool = False
+
+
+# =============================================================================
+# FRONTEND DATA ENDPOINTS SCHEMAS
+# =============================================================================
+
+
+class SiloOverviewItem(BaseModel):
+    """Estado actual de un silo individual."""
+    silo_id: str
+    temperature: float
+    humidity: float
+    co2: float
+    risk_score: int
+    risk_level: str
+    last_update: str
+
+
+class SilosOverviewResponse(BaseModel):
+    """Response para /silos/overview."""
+    silos: List[SiloOverviewItem]
+    total: int
+    timestamp: str
+
+
+class SiloHistoryItem(BaseModel):
+    """Un punto en el historial de un silo."""
+    timestamp: str
+    temperature: float
+    humidity: float
+    co2: float
+
+
+class SiloHistoryResponse(BaseModel):
+    """Response para /silos/{id}/history."""
+    silo_id: str
+    history: List[SiloHistoryItem]
+    hours: int
+    total_points: int

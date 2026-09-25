@@ -1,2 +1,29 @@
-/venv
+# Python
+/venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Environment
 .env
+
+# Firebase credentials (NUNCA subir secretos)
+firebase/serviceAccountKey.json
+firebase/*.json
+
+# Model weights
+data/*.h5
+models/*.h5
+*.keras
+
+# Logs
+*.log
+outputs/
+
+# IDE
+.vscode/
+.idea/

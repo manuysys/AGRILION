@@ -1,7 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
+
+interface Meteor {
+  id: number;
+  left: string;
+  delay: string;
+  duration: string;
+}
+
+function createMeteors(count: number): Meteor[] {
+  return new Array(count).fill(true).map((_, idx) => ({
+    id: idx,
+    left: Math.floor(Math.random() * (400 - -400) + -400) + 'px',
+    delay: Math.random() * (0.8 - 0.2) + 0.2 + 's',
+    duration: Math.floor(Math.random() * (10 - 2) + 2) + 's',
+  }));
+}
 
 export const Meteors = ({
   number,
@@ -10,19 +26,8 @@ export const Meteors = ({
   number?: number;
   className?: string;
 }) => {
-  const [meteors, setMeteors] = useState<
-    { id: number; left: string; delay: string; duration: string }[]
-  >([]);
-
-  useEffect(() => {
-    const meteorsArr = new Array(number || 20).fill(true).map((_, idx) => ({
-      id: idx,
-      left: Math.floor(Math.random() * (400 - -400) + -400) + 'px',
-      delay: Math.random() * (0.8 - 0.2) + 0.2 + 's',
-      duration: Math.floor(Math.random() * (10 - 2) + 2) + 's',
-    }));
-    setMeteors(meteorsArr);
-  }, [number]);
+  // Lazy initializer: meteors are generated once on mount (client-only values)
+  const [meteors] = useState<Meteor[]>(() => createMeteors(number || 20));
 
   return (
     <>

@@ -1,0 +1,10 @@
+/build
+
+# Firebase credentials (NUNCA subir secretos)
+google-services.json
+
+# Local configuration
+local.properties
+
+# Generated
+*.iml

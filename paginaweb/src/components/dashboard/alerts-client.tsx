@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Filter } from 'lucide-react';
 import type { Alert, AlertSeverity } from '@/types';
 import AlertCard from '@/components/ui/alert-card';
@@ -9,14 +10,23 @@ interface AlertsClientProps {
   alerts: Alert[];
 }
 
-const filterOptions: { value: AlertSeverity | 'all' | 'resolved'; label: string; color: string }[] = [
-  { value: 'all', label: 'Todas', color: 'bg-gray-100 text-gray-700' },
-  { value: 'critical', label: 'Críticas', color: 'bg-red-50 text-red-700' },
-  { value: 'high', label: 'Altas', color: 'bg-red-50 text-red-600' },
-  { value: 'medium', label: 'Atención', color: 'bg-amber-50 text-amber-700' },
-  { value: 'low', label: 'Bajas', color: 'bg-gray-50 text-gray-600' },
-  { value: 'resolved', label: 'Resueltas', color: 'bg-emerald-50 text-emerald-700' },
+const filterOptions: { value: AlertSeverity | 'all' | 'resolved'; label: string }[] = [
+  { value: 'all', label: 'Todas' },
+  { value: 'critical', label: 'Críticas' },
+  { value: 'high', label: 'Altas' },
+  { value: 'medium', label: 'Atención' },
+  { value: 'low', label: 'Bajas' },
+  { value: 'resolved', label: 'Resueltas' },
 ];
+
+const filterColors: Record<string, string> = {
+  all: 'bg-white/10 text-white',
+  critical: 'bg-red-500/20 text-red-400',
+  high: 'bg-red-400/20 text-red-300',
+  medium: 'bg-amber-500/20 text-amber-400',
+  low: 'bg-blue-400/20 text-blue-300',
+  resolved: 'bg-emerald-500/20 text-emerald-400',
+};
 
 export default function AlertsClient({ alerts: initialAlerts }: AlertsClientProps) {
   const [filter, setFilter] = useState<string>('all');
@@ -55,16 +65,21 @@ export default function AlertsClient({ alerts: initialAlerts }: AlertsClientProp
   const criticalCount = alerts.filter((a) => a.severity === 'critical' && !a.acknowledged).length;
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 lg:px-6 py-4 lg:py-6 space-y-6">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+      className="max-w-[1400px] mx-auto px-4 lg:px-6 py-4 lg:py-6 space-y-6"
+    >
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold text-[var(--text-primary)]">
+        <h1 className="text-2xl lg:text-3xl font-bold text-white">
           Alertas
         </h1>
-        <p className="text-sm text-[var(--text-muted)] mt-1">
+        <p className="text-sm text-zinc-500 mt-1">
           {activeCount} alerta{activeCount !== 1 ? 's' : ''} activa{activeCount !== 1 ? 's' : ''}
           {criticalCount > 0 && (
-            <span className="text-[var(--state-critical)] font-medium">
+            <span className="text-red-500 font-medium">
               {' '}· {criticalCount} crítica{criticalCount > 1 ? 's' : ''}
             </span>
           )}
@@ -73,40 +88,50 @@ export default function AlertsClient({ alerts: initialAlerts }: AlertsClientProp
 
       {/* Filters + Search */}
       <div className="flex flex-col sm:flex-row gap-3">
-        {/* Filter pills */}
-        <div className="flex flex-wrap gap-2 flex-1">
-          {filterOptions.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setFilter(opt.value)}
-              className={`
-                px-3 py-1.5 rounded-full text-sm font-medium
-                transition-all duration-150 cursor-pointer
-                ${filter === opt.value
-                  ? `${opt.color} ring-2 ring-offset-1 ring-current/20`
-                  : 'bg-white text-[var(--text-muted)] border border-[var(--border-default)] hover:bg-[var(--surface-1)]'
-                }
-              `}
-            >
-              {opt.label}
-            </button>
-          ))}
+        {/* Filter pills with animated indicator */}
+        <div className="flex flex-wrap gap-2 flex-1 p-1.5 rounded-2xl glass-dark border border-white/5">
+          {filterOptions.map((opt) => {
+            const isActive = filter === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => setFilter(opt.value)}
+                className={`
+                  relative px-4 py-2 rounded-xl text-xs font-bold tracking-wider uppercase
+                  transition-all duration-300 cursor-pointer select-none
+                  ${isActive
+                    ? filterColors[opt.value]
+                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
+                  }
+                `}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="active-alert-filter"
+                    className="absolute inset-0 rounded-xl bg-white/10"
+                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10">{opt.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Search */}
         <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
           <input
             type="text"
             placeholder="Buscar alertas..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="
-              w-full sm:w-64 pl-9 pr-4 py-2 rounded-lg
-              border border-[var(--border-default)] bg-white
-              text-sm text-[var(--text-primary)]
-              placeholder:text-[var(--text-muted)]
-              focus:border-[var(--brand-accent)] focus:ring-2 focus:ring-[var(--brand-accent)]/10
+              w-full sm:w-64 pl-9 pr-4 py-2.5 rounded-xl
+              border border-white/10 bg-zinc-900/60 backdrop-blur-xl
+              text-sm text-white
+              placeholder:text-zinc-600
+              focus:border-emerald-500/50
               transition-colors duration-150
               outline-none
             "
@@ -115,27 +140,43 @@ export default function AlertsClient({ alerts: initialAlerts }: AlertsClientProp
       </div>
 
       {/* Alert list */}
-      {filteredAlerts.length === 0 ? (
-        <div className="p-12 rounded-xl bg-white border border-[var(--border-default)] text-center">
-          <Filter size={32} className="text-[var(--text-muted)] mx-auto mb-3 opacity-40" />
-          <p className="text-sm font-medium text-[var(--text-primary)]">
-            No se encontraron alertas
-          </p>
-          <p className="text-xs text-[var(--text-muted)] mt-1">
-            Probá con otros filtros o términos de búsqueda
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filteredAlerts.map((alert) => (
-            <AlertCard
-              key={alert.id}
-              alert={alert}
-              onAcknowledge={handleAcknowledge}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+      <motion.div layout className="space-y-3">
+        <AnimatePresence mode="popLayout">
+          {filteredAlerts.length === 0 ? (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="p-12 rounded-2xl glass-dark border border-white/10 text-center"
+            >
+              <Filter size={32} className="text-zinc-600 mx-auto mb-3" />
+              <p className="text-sm font-medium text-white">
+                No se encontraron alertas
+              </p>
+              <p className="text-xs text-zinc-500 mt-1">
+                Probá con otros filtros o términos de búsqueda
+              </p>
+            </motion.div>
+          ) : (
+            filteredAlerts.map((alert, i) => (
+              <motion.div
+                key={alert.id}
+                layout
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.4, delay: i * 0.04, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <AlertCard
+                  alert={alert}
+                  onAcknowledge={handleAcknowledge}
+                />
+              </motion.div>
+            ))
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </motion.div>
   );
 }

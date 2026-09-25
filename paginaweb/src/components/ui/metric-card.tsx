@@ -23,15 +23,15 @@ const iconMap: Record<string, LucideIcon> = {
 };
 
 const stateColors = {
-  ok: 'text-[var(--text-secondary)]',
-  warn: 'text-[var(--state-warn)]',
-  critical: 'text-[var(--state-critical)]',
+  ok: 'text-emerald-400',
+  warn: 'text-amber-400',
+  critical: 'text-red-500',
 };
 
 const stateBgColors = {
-  ok: 'bg-[var(--surface-1)]',
-  warn: 'bg-[var(--state-warn-bg)]',
-  critical: 'bg-[var(--state-critical-bg)]',
+  ok: 'bg-emerald-500/10',
+  warn: 'bg-amber-500/10',
+  critical: 'bg-red-500/10',
 };
 
 function MiniSparkline({ data, color }: { data: number[]; color: string }) {
@@ -101,8 +101,8 @@ export default function MetricCard({
   return (
     <div
       className={`
-        rounded-xl border border-[var(--border-default)] bg-white p-4
-        transition-shadow duration-200 hover:shadow-[var(--shadow-md)]
+        rounded-xl border border-white/10 bg-zinc-900/60 backdrop-blur-xl p-4
+        transition-all duration-300 hover:bg-white/5 hover:border-white/20
         ${className}
       `}
     >
@@ -113,7 +113,7 @@ export default function MetricCard({
               <Icon size={18} className={stateColors[state]} />
             </div>
           )}
-          <span className="text-sm text-[var(--text-muted)]">{label}</span>
+          <span className="text-sm text-zinc-400">{label}</span>
         </div>
         {sparklineData && sparklineData.length > 2 && (
           <MiniSparkline data={sparklineData} color={sparkColor} />

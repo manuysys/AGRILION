@@ -63,7 +63,7 @@ void configurarADXL345()
   Wire.endTransmission();
 
   Wire.beginTransmission(0x53);
-  Wire.write(0x2E); Wire.write(0x01); // INT_ENABLE → Activity (bit 0, no DATA_READY)
+  Wire.write(0x2E); Wire.write(0x10); // INT_ENABLE → Activity (bit 4, no DATA_READY)
   Wire.endTransmission();
 
   Wire.beginTransmission(0x53);
@@ -115,7 +115,8 @@ void prepareTxFrame(uint8_t port)
   bool medicionLista = false;
   for (int i = 0; i < 13; i++) {
     delay(500);
-    if (scd41.readMeasurement()) {
+      // En esta librería, false significa lectura exitosa sin error
+    if (scd41.readMeasurement() == false) {
       co2 = scd41.getCO2();
       medicionLista = true;
       break;
@@ -164,9 +165,17 @@ void setup()
   Wire.begin();
   Wire.setClock(50000);
 
-  bme.begin(0x76);
-  sht30.begin(0x44);
+  // BME280
+  if (!bme.begin(0x76) && !bme.begin(0x77)) {
+    Serial.println("WARNING: BME280 no detectado.");
+  }
+  
+  // SHT30
+  if (!sht30.begin(0x44)) {
+    Serial.println("WARNING: SHT30 no detectado en 0x44.");
+  }
 
+  // SCD41
   if (!scd41.begin(Wire)) {
     Serial.println("WARNING: SCD41 no detectado en setup.");
   }
