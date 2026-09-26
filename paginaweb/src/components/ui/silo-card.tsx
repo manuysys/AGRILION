@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Battery, Clock, ChevronRight } from 'lucide-react';
 import type { SiloBag } from '@/types';
 import StatusPill from './status-pill';
-import { formatRelativeTime, formatTemp, formatHumidity, formatCO2, getFreshnessColor } from '@/lib/formatters';
+import { formatRelativeTime, formatTemp, formatHumidity, formatCO2, formatBattery, getFreshnessColor } from '@/lib/formatters';
 import { getTemperatureState, getHumidityState, getCO2State, getBatteryState } from '@/lib/thresholds';
 
 interface SiloCardProps {
@@ -112,8 +112,8 @@ export default function SiloCard({ silo, rank, className = '' }: SiloCardProps) 
         {/* Meta info */}
         <div className="flex items-center gap-4 text-xs text-zinc-500 ml-auto tracking-wide">
           <span className="flex items-center gap-1.5">
-            <Battery size={14} className={batteryState === 'critical' ? 'text-red-500' : batteryState === 'low' ? 'text-amber-500' : ''} />
-            <span className="font-data font-medium">{silo.sensor.battery}%</span>
+            <Battery size={14} className={batteryState === 'critical' ? 'text-red-500' : batteryState === 'low' ? 'text-amber-500' : 'text-zinc-500'} />
+            <span className="font-data font-medium">{formatBattery(silo.sensor.battery)}</span>
           </span>
           <span className={`flex items-center gap-1.5 ${freshnessColor}`}>
             <Clock size={14} />

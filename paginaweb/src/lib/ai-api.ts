@@ -20,6 +20,8 @@ export interface SiloOverview {
   risk_score: number;
   risk_level: 'NORMAL' | 'WARNING' | 'CRITICAL';
   last_update: string;
+  grain_type?: string | null;
+  device_id?: string | null;
 }
 
 export interface SiloHistoryPoint {
@@ -72,8 +74,20 @@ export interface HealthResponse {
 }
 
 // ─── Base URL ────────────────────────────────────────────────────────────────
+//
+// En el navegador se usa el proxy de Next (`/api/ai/*` → rewrite a la AI API).
+// En el servidor (SSR/build) las URLs relativas no son válidas: se llama
+// directo a la AI API usando AI_API_URL (server-only, nunca llega al cliente).
 
-const AI_BASE = '/api/ai';
+const AI_PROXY_BASE = '/api/ai';
+const AI_SERVER_BASE = `${process.env.AI_API_URL || 'http://localhost:8000'}/api/v1`;
+
+function apiUrl(path: string): string {
+  if (typeof window === 'undefined') {
+    return `${AI_SERVER_BASE}${path}`;
+  }
+  return `${AI_PROXY_BASE}${path}`;
+}
 
 // ─── API Functions ───────────────────────────────────────────────────────────
 
@@ -82,7 +96,7 @@ const AI_BASE = '/api/ai';
  */
 export async function checkHealth(): Promise<HealthResponse | null> {
   try {
-    const res = await fetch(`${AI_BASE}/health`);
+    const res = await fetch(apiUrl('/health'));
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -95,7 +109,7 @@ export async function checkHealth(): Promise<HealthResponse | null> {
  */
 export async function getSilosOverview(): Promise<SiloOverview[]> {
   try {
-    const res = await fetch(`${AI_BASE}/silos/overview`);
+    const res = await fetch(apiUrl('/silos/overview'));
     if (!res.ok) {
       console.warn(`AI API overview failed: ${res.status}`);
       return [];
@@ -116,7 +130,7 @@ export async function getSiloHistory(
   hours: number = 24
 ): Promise<SiloHistoryPoint[]> {
   try {
-    const res = await fetch(`${AI_BASE}/silos/${siloId}/history?hours=${hours}`);
+    const res = await fetch(apiUrl(`/silos/${siloId}/history?hours=${hours}`));
     if (!res.ok) {
       console.warn(`AI API history failed: ${res.status}`);
       return [];
@@ -136,7 +150,7 @@ export async function getSiloCurrent(
   siloId: string
 ): Promise<SiloOverview | null> {
   try {
-    const res = await fetch(`${AI_BASE}/silos/${siloId}/current`);
+    const res = await fetch(apiUrl(`/silos/${siloId}/current`));
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -157,14 +171,17 @@ export async function sendChatMessage(
   sessionId?: string
 ): Promise<ChatResponse | null> {
   try {
-    const res = await fetch(`${AI_BASE}/chat`, {
+    const payload: Record<string, string> = {
+      message,
+      session_id: sessionId || 'web-dashboard',
+    };
+    // Solo se envía silo_id si el usuario eligió uno (evita contexto falso)
+    if (siloId) payload.silo_id = siloId;
+
+    const res = await fetch(apiUrl('/chat'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message,
-        silo_id: siloId || 'SILO_001',
-        session_id: sessionId || 'web-dashboard',
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
@@ -186,7 +203,7 @@ export async function summarizeSilo(
   siloId: string
 ): Promise<ChatResponse | null> {
   try {
-    const res = await fetch(`${AI_BASE}/chat/summarize/${siloId}`, {
+    const res = await fetch(apiUrl(`/chat/summarize/${siloId}`), {
       method: 'POST',
     });
     if (!res.ok) return null;
@@ -204,7 +221,7 @@ export async function ingestReading(
   reading: IngestRequest
 ): Promise<IngestResponse | null> {
   try {
-    const res = await fetch(`${AI_BASE}/ingest`, {
+    const res = await fetch(apiUrl('/ingest'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(reading),
@@ -223,7 +240,7 @@ export async function clearChatSession(
   sessionId: string
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${AI_BASE}/chat/session/${sessionId}`, {
+    const res = await fetch(apiUrl(`/chat/session/${sessionId}`), {
       method: 'DELETE',
     });
     return res.ok;

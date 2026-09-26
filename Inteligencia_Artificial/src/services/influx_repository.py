@@ -163,7 +163,7 @@ class InfluxRepository(AbstractSiloRepository):
         # Traemos las últimas lecturas de cada silo en la última hora
         # Usamos una subquery para obtener el último timestamp por silo
         query = f"""
-        SELECT s.time, s.silo, s.temperatura, s.humedad, s.co2, s.score
+        SELECT s.time, s.silo, s.grano, s.device, s.temperatura, s.humedad, s.co2, s.score
         FROM "{self._measurement}" s
         INNER JOIN (
             SELECT silo, MAX(time) AS max_time
@@ -189,6 +189,9 @@ class InfluxRepository(AbstractSiloRepository):
 
                 level = self._score_to_level(score)
 
+                grain = row.get("grano")
+                device = row.get("device")
+
                 silos.append({
                     "silo_id": str(silo_id),
                     "temperature": round(temp, 1),
@@ -197,6 +200,8 @@ class InfluxRepository(AbstractSiloRepository):
                     "risk_score": score,
                     "risk_level": level,
                     "last_update": str(row.get("time", "")),
+                    "grain_type": str(grain) if pd.notna(grain) else None,
+                    "device_id": str(device) if pd.notna(device) else None,
                 })
 
             return silos

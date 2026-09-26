@@ -1,12 +1,69 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, CheckCircle2, Loader2 } from "lucide-react";
 import { RiveLogo } from "@/components/ui/rive-logo";
 import { AnimatedShaderBackground } from "@/components/ui/animated-shader-hero";
 import { motion } from "framer-motion";
+import { isFirebaseConfigured, FIREBASE_NOT_CONFIGURED_MESSAGE } from "@/lib/firebase";
+import { signInWithEmail, signInWithGoogle, sendPasswordReset } from "@/lib/auth-client";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setInfo(null);
+    setLoading(true);
+    try {
+      await signInWithEmail(email.trim(), password);
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo iniciar sesión");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    setError(null);
+    setInfo(null);
+    if (!email.trim()) {
+      setError("Ingresá tu email y volvé a tocar “¿Olvidaste tu contraseña?”.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await sendPasswordReset(email.trim());
+      setInfo("Te enviamos un correo para restablecer la contraseña.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo enviar el correo");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGoogle() {
+    setError(null);
+    setLoading(true);
+    try {
+      await signInWithGoogle();
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo iniciar con Google");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-black text-white flex">
       {/* Left Column: Form */}
@@ -37,12 +94,22 @@ export default function LoginPage() {
               Ingresá tus credenciales para acceder a tu panel de control.
             </p>
 
-            <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+            {!isFirebaseConfigured && (
+              <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-300">
+                {FIREBASE_NOT_CONFIGURED_MESSAGE}
+              </div>
+            )}
+
+            <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-zinc-300">Email Profesional</label>
                 <input 
                   type="email" 
                   placeholder="ejemplo@empresa.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
                   className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
                 />
               </div>
@@ -50,20 +117,46 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium text-zinc-300">Contraseña</label>
-                  <Link href="#" className="text-sm text-emerald-500 hover:text-emerald-400 transition-colors">
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    disabled={loading || !isFirebaseConfigured}
+                    className="text-sm text-emerald-500 hover:text-emerald-400 transition-colors disabled:opacity-50"
+                  >
                     ¿Olvidaste tu contraseña?
-                  </Link>
+                  </button>
                 </div>
                 <input 
                   type="password" 
                   placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
                   className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
                 />
               </div>
 
-              <Link href="/dashboard" className="block w-full text-center bg-emerald-500 text-black font-bold rounded-xl px-4 py-3 hover:bg-emerald-400 hover:scale-[1.02] transition-all mt-4 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+              {error && (
+                <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-3 text-sm text-rose-300">
+                  {error}
+                </div>
+              )}
+
+              {info && (
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm text-emerald-300">
+                  {info}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading || !isFirebaseConfigured}
+                className="flex items-center justify-center gap-2 w-full bg-emerald-500 text-black font-bold rounded-xl px-4 py-3 hover:bg-emerald-400 hover:scale-[1.02] transition-all mt-4 shadow-[0_0_20px_rgba(16,185,129,0.2)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              >
+                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                 Iniciar Sesión
-              </Link>
+              </button>
             </form>
 
             <div className="mt-8 relative">
@@ -76,7 +169,12 @@ export default function LoginPage() {
             </div>
 
             <div className="mt-8 grid grid-cols-2 gap-4">
-              <button className="flex items-center justify-center gap-2 bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 hover:bg-zinc-800 transition-colors">
+              <button
+                type="button"
+                onClick={handleGoogle}
+                disabled={loading || !isFirebaseConfigured}
+                className="flex items-center justify-center gap-2 bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 hover:bg-zinc-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                   <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -85,7 +183,11 @@ export default function LoginPage() {
                 </svg>
                 Google
               </button>
-              <button className="flex items-center justify-center gap-2 bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 hover:bg-zinc-800 transition-colors">
+              <button
+                type="button"
+                disabled
+                className="flex items-center justify-center gap-2 bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 opacity-40 cursor-not-allowed"
+              >
                 <svg className="w-5 h-5" viewBox="0 0 21 21">
                   <path fill="#f25022" d="M0 0h10v10H0z"/>
                   <path fill="#7fba00" d="M11 0h10v10H11z"/>
@@ -99,7 +201,7 @@ export default function LoginPage() {
             <p className="mt-8 text-center text-sm text-zinc-500">
               ¿No tienes una cuenta?{" "}
               <Link href="/registro" className="text-white hover:text-emerald-400 font-medium transition-colors">
-                Solicitá una demo
+                Crear cuenta
               </Link>
             </p>
           </motion.div>

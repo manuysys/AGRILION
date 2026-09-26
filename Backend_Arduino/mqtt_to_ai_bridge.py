@@ -19,6 +19,7 @@ Requiere:
 import json
 import ssl
 import os
+import sys
 import time
 import logging
 import threading
@@ -26,6 +27,13 @@ from datetime import datetime
 from dotenv import load_dotenv
 from paho.mqtt import client as mqtt_client
 import requests
+
+from device_registry import get_device_info
+
+# Consola Windows (cp1252) no soporta emojis: forzar UTF-8
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # =========================
 # LOGGING
@@ -55,30 +63,16 @@ AI_API_URL = os.getenv("AI_API_URL", "http://localhost:8000/api/v1")
 AI_API_TIMEOUT = int(os.getenv("AI_API_TIMEOUT", "10"))
 
 # =========================
-# DEVICE → SILO MAPPING (cache)
+# DEVICE → SILO MAPPING
 # =========================
-device_silo_map: dict[str, str] = {}
-
-
-def load_device_mapping(device_id: str) -> str | None:
+def load_device_mapping(device_id: str) -> str:
     """
-    Obtener el silo_id asociado a un device_id.
+    Resuelve el silo_id real del sensor usando el mismo criterio que
+    MQTT_INFLUXDB_FIREBASE.py (Firestore → DEFAULT_SILO_ID del .env).
 
-    Estrategia actual: usa una convención de nombres.
-    Los devices de TTN se nombran como "eui-xxxxxxxx" y se mapean
-    a silos en Firestore. Para simplificar, usamos un fallback.
-
-    En producción, esto debería consultar Firebase o un config file.
+    Así la AI API y el dashboard ven el MISMO id de silo que InfluxDB.
     """
-    if device_id in device_silo_map:
-        return device_silo_map[device_id]
-
-    # Fallback: mapeo simple basado en el device_id
-    # Podés personalizar esto con tu mapping real
-    silo_id = f"SILO_{device_id[-4:].upper()}"
-    device_silo_map[device_id] = silo_id
-    logger.debug(f"Mapped {device_id} → {silo_id}")
-    return silo_id
+    return get_device_info(device_id)["silo_id"]
 
 
 # =========================

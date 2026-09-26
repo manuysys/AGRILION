@@ -50,8 +50,8 @@ python main.py --data path/to/sensors.csv
 python main.py --skip-training --no-plots
 python main.py --epochs 100 --batch-size 64
 
-# FastAPI on http://localhost:8001 (note: 8001, not 8000)
-uvicorn api.app:app --reload --port 8001
+# FastAPI on http://localhost:8000
+uvicorn api.app:app --reload --port 8000
 # Docs at /docs
 ```
 
@@ -64,15 +64,15 @@ python -m pytest tests/test_pipeline.py::TestRiskEngine -v
 
 Endpoints (all under `/api/v1`): `GET /health`, `GET /model/status`, `POST /predict`, `POST /analyze`, `POST /ingest`, `POST /chat`. Input CSV must include `timestamp, temperature, humidity, co2, silo_id`.
 
-### Backend_Arduino/ (telemetry bridge, port 8000)
+### Backend_Arduino/ (telemetry bridges)
 
 ```bash
 cd Backend_Arduino
 pip install -r requirements.txt
-python main.py
+python main.py            # launcher: runs the 3 bridges in parallel
 ```
 
-`main.py` runs the TTN→InfluxDB→Firebase bridge. `MQTT_INFLUXDB_FIREBASE.py` and `TTN_MQTT.py` are the long-running MQTT consumers. InfluxDB tokens live in local untracked files (`Backend_Arduino/APIToken_InfluxDB.txt`, `INFLUXDB_TOKEN.txt`) — never commit them. `TTN_Payload_Formatter.js` is the The Things Network decoder.
+`main.py` is a local launcher for the three long-running processes: `TTN_MQTT.py` (TTN→HiveMQ bridge), `MQTT_INFLUXDB_FIREBASE.py` (HiveMQ→InfluxDB+Firebase processor) and `mqtt_to_ai_bridge.py` (HiveMQ→AI API `/ingest`). In Docker, `supervisord.conf` runs the same three. `device_registry.py` resolves `device_id → silo_id` (Firestore `sensors/{device_id}`, fallback `DEFAULT_SILO_ID`). InfluxDB tokens live in local untracked files (`Backend_Arduino/.env`, `APIToken_InfluxDB.txt`) — never commit them. `TTN_Payload_Formatter.js` is the The Things Network decoder.
 
 ## Architecture (big picture)
 

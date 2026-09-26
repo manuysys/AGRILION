@@ -82,7 +82,21 @@ export default function RiskRanking({ silos }: RiskRankingProps) {
       {/* Silobags list with animations */}
       <motion.div layout className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <AnimatePresence mode="popLayout">
-          {filteredSilos.length === 0 ? (
+          {silos.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="col-span-full p-12 rounded-3xl glass-dark border border-white/5 text-center"
+            >
+              <p className="text-xl font-light text-white mb-2">
+                Todavía no hay silobolsas
+              </p>
+              <p className="text-sm font-light text-zinc-500">
+                Registrá una lanza desde Configuración para empezar a ver datos.
+              </p>
+            </motion.div>
+          ) : filteredSilos.length === 0 ? (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}

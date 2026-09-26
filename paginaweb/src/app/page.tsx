@@ -284,12 +284,12 @@ export default function Home() {
       <TestimonialsSection />
 
       {/* PRICING */}
-      <section id="planes">
+      <section>
         <PricingSection />
       </section>
 
       {/* CALL TO ACTION */}
-      <section id="contacto">
+      <section>
         <CtaSection />
       </section>
 
@@ -312,9 +312,9 @@ export default function Home() {
           <div className="w-full border-t border-white/5 pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-zinc-600">
             <span>&copy; {new Date().getFullYear()} Agrilion. Todos los derechos reservados.</span>
             <div className="flex gap-6 mt-4 md:mt-0">
-              <a href="#" className="hover:text-emerald-500 transition-colors">Términos</a>
-              <a href="#" className="hover:text-emerald-500 transition-colors">Privacidad</a>
-              <a href="#" className="hover:text-emerald-500 transition-colors">Contacto</a>
+              <Link href="/terminos" className="hover:text-emerald-500 transition-colors">Términos</Link>
+              <Link href="/privacidad" className="hover:text-emerald-500 transition-colors">Privacidad</Link>
+              <a href="mailto:eest4.74.agrilion@gmail.com" className="hover:text-emerald-500 transition-colors">Contacto</a>
             </div>
           </div>
         </div>

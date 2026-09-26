@@ -241,7 +241,11 @@ export const mockDashboardStats: DashboardStats = {
   activeAlerts: mockAlerts.filter((a) => !a.acknowledged).length,
   criticalAlerts: mockAlerts.filter((a) => a.severity === 'critical').length,
   averageBattery: Math.round(
-    mockSiloBags.reduce((acc, s) => acc + s.sensor.battery, 0) / mockSiloBags.length
+    mockSiloBags
+      .map((s) => s.sensor.battery)
+      .filter((b): b is number => typeof b === 'number')
+      .reduce((acc, b) => acc + b, 0) /
+      (mockSiloBags.filter((s) => typeof s.sensor.battery === 'number').length || 1)
   ),
   lastGlobalUpdate: hoursAgo(0.5),
   systemHealth: 'critical', // because SB-005 is critical

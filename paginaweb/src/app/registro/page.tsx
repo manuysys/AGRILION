@@ -1,12 +1,58 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, CheckCircle2, Loader2 } from "lucide-react";
 import { RiveLogo } from "@/components/ui/rive-logo";
 import { AnimatedShaderBackground } from "@/components/ui/animated-shader-hero";
 import { motion } from "framer-motion";
+import { isFirebaseConfigured, FIREBASE_NOT_CONFIGURED_MESSAGE } from "@/lib/firebase";
+import { registerWithEmail } from "@/lib/auth-client";
 
 export default function RegisterPage() {
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [company, setCompany] = useState("");
+  const [silosEstimate, setSilosEstimate] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (password.length < 6) {
+      setError("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await registerWithEmail({
+        email: email.trim(),
+        password,
+        name,
+        lastName,
+        company,
+        silosEstimate,
+      });
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo crear la cuenta");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-black text-white flex">
       {/* Left Column: Visual */}
@@ -62,18 +108,27 @@ export default function RegisterPage() {
               <span className="font-black tracking-tighter text-3xl">AGRILION</span>
             </div>
 
-            <h1 className="text-3xl font-bold mb-2">Solicitar Demo</h1>
+            <h1 className="text-3xl font-bold mb-2">Crear cuenta</h1>
             <p className="text-zinc-400 mb-8">
-              Dejanos tus datos y un especialista en AgTech te contactará.
+              Registrate para monitorear tus silobolsas en tiempo real.
             </p>
 
-            <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+            {!isFirebaseConfigured && (
+              <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-300">
+                {FIREBASE_NOT_CONFIGURED_MESSAGE}
+              </div>
+            )}
+
+            <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-zinc-300">Nombre</label>
                   <input 
                     type="text" 
                     placeholder="Juan"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
                     className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
                   />
                 </div>
@@ -82,6 +137,8 @@ export default function RegisterPage() {
                   <input 
                     type="text" 
                     placeholder="Pérez"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
                     className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
                   />
                 </div>
@@ -92,6 +149,10 @@ export default function RegisterPage() {
                 <input 
                   type="email" 
                   placeholder="juan@empresa.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
                   className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
                 />
               </div>
@@ -101,6 +162,8 @@ export default function RegisterPage() {
                 <input 
                   type="text" 
                   placeholder="Estancia El Sol"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
                   className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
                 />
               </div>
@@ -109,7 +172,8 @@ export default function RegisterPage() {
                 <label className="text-sm font-medium text-zinc-300">Silobolsas estimadas por año</label>
                 <select
                   className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-emerald-500 transition-colors appearance-none text-white cursor-pointer"
-                  defaultValue=""
+                  value={silosEstimate}
+                  onChange={(e) => setSilosEstimate(e.target.value)}
                 >
                   <option value="" disabled>Seleccioná un rango</option>
                   <option value="1-10">1 - 10 silobolsas</option>
@@ -119,8 +183,48 @@ export default function RegisterPage() {
                 </select>
               </div>
 
-              <button className="w-full bg-emerald-500 text-black font-bold rounded-xl px-4 py-3 hover:bg-emerald-400 hover:scale-[1.02] transition-all mt-4 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
-                Agendar Demostración
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-300">Contraseña</label>
+                  <input 
+                    type="password" 
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    autoComplete="new-password"
+                    className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-300">Repetir contraseña</label>
+                  <input 
+                    type="password" 
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    autoComplete="new-password"
+                    className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-3 text-sm text-rose-300">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading || !isFirebaseConfigured}
+                className="flex items-center justify-center gap-2 w-full bg-emerald-500 text-black font-bold rounded-xl px-4 py-3 hover:bg-emerald-400 hover:scale-[1.02] transition-all mt-4 shadow-[0_0_20px_rgba(16,185,129,0.2)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              >
+                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                Crear cuenta
               </button>
             </form>
 

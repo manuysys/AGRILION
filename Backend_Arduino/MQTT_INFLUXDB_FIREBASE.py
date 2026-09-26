@@ -24,25 +24,25 @@ Esquema esperado en Firestore:
 import json
 import ssl
 import os
+import sys
 import time
 from collections import deque
 from dotenv import load_dotenv
 from paho.mqtt import client as mqtt_client
 from influxdb_client_3 import InfluxDBClient3, Point
-import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import firestore
+
+from device_registry import get_device_info, get_firestore_db
+
+# Consola Windows (cp1252) no soporta emojis: forzar UTF-8
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # =========================
 # LOAD ENV
 # =========================
 load_dotenv()
-
-# TTN
-TTN_BROKER = os.getenv("TTN_BROKER")
-TTN_PORT = int(os.getenv("TTN_PORT"))
-TTN_USER = os.getenv("TTN_USER")
-TTN_PASS = os.getenv("TTN_PASS")
-TTN_TOPIC = f"v3/{TTN_USER}/devices/+/up"
 
 # HiveMQ
 HIVEMQ_BROKER = os.getenv("HIVEMQ_BROKER")
@@ -60,59 +60,8 @@ INFLUX_DATABASE = os.getenv("INFLUX_DATABASE", os.getenv("INFLUX_BUCKET", "silob
 # =========================
 # FIREBASE (solo para datos categóricos)
 # =========================
-cred_path = "firebase/serviceAccountKey.json"
-try:
-    if not firebase_admin._apps:
-        cred = credentials.Certificate(cred_path)
-        firebase_admin.initialize_app(cred)
-    db = firestore.client()
-    FIREBASE_OK = True
-    print(f"✅ Firebase inicializado (solo para datos categóricos)")
-except Exception as e:
-    print(f"⚠️ Firebase no disponible: {e} — las lecturas seguirán guardándose en InfluxDB")
-    db = None
-    FIREBASE_OK = False
-
-# Caché de device → silo info (para no consultar Firestore en cada lectura)
-device_cache = {}
-
-def get_device_data(device_id):
-    """
-    Obtiene la info del sensor desde Firestore (colección global `sensors`).
-
-    Estructura esperada:
-        sensors/{device_id} = {
-            ownerUid: str,
-            siloId: str,
-            siloPath: str,
-            active: bool,
-            lastSeen: Timestamp
-        }
-
-    Si no existe, intenta lookup legacy en `devices` (compatibilidad).
-    """
-    if device_id in device_cache:
-        return device_cache[device_id]
-
-    if not FIREBASE_OK:
-        return None
-
-    # Nuevo esquema: colección global `sensors`
-    doc = db.collection("sensors").document(device_id).get()
-    if doc.exists:
-        data = doc.to_dict()
-        device_cache[device_id] = data
-        return data
-
-    # Fallback: schema legacy `devices`
-    doc_legacy = db.collection("devices").document(device_id).get()
-    if doc_legacy.exists:
-        data = doc_legacy.to_dict()
-        device_cache[device_id] = data
-        return data
-
-    print(f"⚠️ Sensor no registrado: {device_id}")
-    return None
+db = get_firestore_db()
+FIREBASE_OK = db is not None
 
 
 def update_sensor_status(device_id: str):
@@ -225,6 +174,8 @@ def evaluar_riesgo(data, config):
         score += 20
         evento = "IMPACTO_FISICO"
 
+    score = min(score, 100)  # tope 0-100 (consistente con la AI API y la web)
+
     # CLASIFICACIÓN
     if score >= 70:
         estado = "RIESGO_ALTO"
@@ -241,11 +192,20 @@ def evaluar_riesgo(data, config):
 # =========================
 # ALERT COOLDOWN (evitar spam de actualizaciones al silo)
 # =========================
+# El cooldown aplica entre actualizaciones del MISMO estado. Si el estado
+# cambia (OK → RIESGO_MEDIO → RIESGO_ALTO), se actualiza de inmediato.
 last_alert_time = {}
+last_alert_state = {}
 COOLDOWN = 300
 
-def puede_alertar(device_id):
+def puede_alertar(device_id, estado=None):
     now = time.time()
+
+    estado_previo = last_alert_state.get(device_id)
+    if estado is not None and estado != estado_previo:
+        last_alert_state[device_id] = estado
+        last_alert_time[device_id] = now
+        return True
 
     if device_id not in last_alert_time:
         last_alert_time[device_id] = now
@@ -300,13 +260,10 @@ def on_hive_message(client, userdata, msg):
         if not device_id:
             return
 
-        info = get_device_data(device_id)
-        if not info:
-            return
-
-        silo_id = info.get("siloId") or info.get("silo_id", "unknown")
-        owner_uid = info.get("ownerUid") or info.get("owner_uid")
-        tipo_grano = info.get("grainType") or info.get("tipo_grano", "maiz")
+        info = get_device_info(device_id)
+        silo_id = info["silo_id"]
+        owner_uid = info["owner_uid"]
+        tipo_grano = info["grain_type"]
 
         config = CONFIG_GRANOS.get(tipo_grano, CONFIG_GRANOS["maiz"])
 
@@ -352,7 +309,7 @@ def on_hive_message(client, userdata, msg):
         update_sensor_status(device_id)
 
         # b) Actualizar el estado del silo (con cooldown para no spamear)
-        if puede_alertar(device_id) and owner_uid and silo_id != "unknown":
+        if owner_uid and silo_id != "unknown" and puede_alertar(device_id, estado):
             actualizar_silo_firebase(
                 owner_uid, silo_id, estado, alerta, score, evento, delta
             )
@@ -373,49 +330,13 @@ hive.on_connect = on_hive_connect
 hive.on_message = on_hive_message
 
 # =========================
-# TTN CLIENT
-# =========================
-ttn = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2)
-ttn.username_pw_set(TTN_USER, TTN_PASS)
-ttn.tls_set(cert_reqs=ssl.CERT_REQUIRED)
-
-def on_ttn_connect(client, userdata, flags, reason_code, properties):
-    if reason_code == 0:
-        print("✅ Conectado a TTN")
-        client.subscribe(TTN_TOPIC)
-    else:
-        print("❌ Error TTN:", reason_code)
-
-def on_ttn_message(client, userdata, msg):
-    try:
-        data = json.loads(msg.payload.decode())
-
-        payload = data.get("uplink_message", {}).get("decoded_payload")
-        device_id = data.get("end_device_ids", {}).get("device_id")
-
-        if not payload or not device_id:
-            return
-
-        payload["device_id"] = device_id
-
-        topic = f"smisia/{device_id}"
-        hive.publish(topic, json.dumps(payload))
-
-    except Exception as e:
-        print("❌ TTN Error:", e)
-
-ttn.on_connect = on_ttn_connect
-ttn.on_message = on_ttn_message
-
-# =========================
 # START
 # =========================
+# Este script es un CONSUMIDOR de HiveMQ. El bridge TTN → HiveMQ es
+# responsabilidad de TTN_MQTT.py (evita publicar cada lectura dos veces).
 hive.connect(HIVEMQ_BROKER, HIVEMQ_PORT)
-hive.loop_start()
 
-ttn.connect(TTN_BROKER, TTN_PORT)
-
-print("🚀 SISTEMA INTELIGENTE ACTIVO")
+print("🚀 SISTEMA INTELIGENTE ACTIVO (HiveMQ → InfluxDB + Firebase)")
 print("   → InfluxDB: lecturas numéricas (time-series)")
 print("   → Firebase: estado de sensores y silos (datos categóricos)")
-ttn.loop_forever()
+hive.loop_forever()

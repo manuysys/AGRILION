@@ -126,7 +126,7 @@ export default function DashboardStats({ stats }: DashboardStatsProps) {
     },
     {
       icon: Bell,
-      label: 'NIVEL DE RIESGO',
+      label: 'ALERTAS ACTIVAS',
       valueContent: <AnimatedCounter from={0} to={stats.activeAlerts} />,
       detail: stats.criticalAlerts > 0 ? `${stats.criticalAlerts} ALERTAS CRÍTICAS` : 'SISTEMA ESTABLE',
       color: stats.criticalAlerts > 0 ? 'text-red-500' : 'text-amber-400',
@@ -136,11 +136,13 @@ export default function DashboardStats({ stats }: DashboardStatsProps) {
     {
       icon: Zap,
       label: 'ENERGÍA',
-      valueContent: <AnimatedCounter from={0} to={stats.averageBattery} suffix="%" />,
-      detail: 'AUTONOMÍA DE RED',
-      color: stats.averageBattery < 30 ? 'text-amber-400' : 'text-zinc-400',
-      sparkColor: stats.averageBattery < 30 ? '#fbbf24' : '#a1a1aa',
-      sparkData: generateSparkData(4, stats.averageBattery < 30 ? 'down' : 'stable'),
+      valueContent: stats.averageBattery > 0
+        ? <AnimatedCounter from={0} to={stats.averageBattery} suffix="%" />
+        : <>—</>,
+      detail: stats.averageBattery > 0 ? 'AUTONOMÍA DE RED' : 'SIN DATOS DE BATERÍA',
+      color: stats.averageBattery > 0 && stats.averageBattery < 30 ? 'text-amber-400' : 'text-zinc-400',
+      sparkColor: stats.averageBattery > 0 && stats.averageBattery < 30 ? '#fbbf24' : '#a1a1aa',
+      sparkData: generateSparkData(4, stats.averageBattery > 0 && stats.averageBattery < 30 ? 'down' : 'stable'),
     },
   ];
 

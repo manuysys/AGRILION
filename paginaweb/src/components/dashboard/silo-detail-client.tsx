@@ -10,7 +10,7 @@ import RiskGauge from '@/components/ui/risk-gauge';
 import TimelineChart from '@/components/ui/timeline-chart';
 import AlertCard from '@/components/ui/alert-card';
 import AnomalyBadge from '@/components/ui/anomaly-badge';
-import { formatTemp, formatHumidity, formatCO2, formatRelativeTime, formatFullDate, getFreshnessColor } from '@/lib/formatters';
+import { formatTemp, formatHumidity, formatCO2, formatBattery, formatRelativeTime, formatFullDate, getFreshnessColor } from '@/lib/formatters';
 import { getTemperatureState, getHumidityState, getCO2State, getBatteryState } from '@/lib/thresholds';
 
 interface SiloDetailClientProps {
@@ -76,8 +76,12 @@ export default function SiloDetailClient({ silo }: SiloDetailClientProps) {
                 <span className="font-data text-zinc-500">{silo.id}</span>
                 <span className="flex items-center gap-1"><MapPin size={14} />{silo.location}</span>
                 <span className="flex items-center gap-1"><Wheat size={14} />{silo.grainType}</span>
-                <span className="flex items-center gap-1"><Weight size={14} />~{silo.estimatedTons} tn</span>
-                <span className="flex items-center gap-1"><Calendar size={14} />Desde {formatFullDate(silo.storedSince)}</span>
+                {silo.estimatedTons !== null && (
+                  <span className="flex items-center gap-1"><Weight size={14} />~{silo.estimatedTons} tn</span>
+                )}
+                {silo.storedSince !== null && (
+                  <span className="flex items-center gap-1"><Calendar size={14} />Desde {formatFullDate(silo.storedSince)}</span>
+                )}
               </div>
             </div>
 
@@ -108,7 +112,7 @@ export default function SiloDetailClient({ silo }: SiloDetailClientProps) {
               Interpretación IA
             </h3>
             <span className="text-xs text-zinc-500 font-data ml-auto">
-              Confianza: {silo.interpretation.confidence}%
+              Confianza: {silo.interpretation.confidence !== null ? `${silo.interpretation.confidence}%` : '—'}
             </span>
           </div>
 
@@ -243,17 +247,20 @@ export default function SiloDetailClient({ silo }: SiloDetailClientProps) {
                   className={
                     batteryState === 'critical' ? 'text-red-500' :
                     batteryState === 'low' ? 'text-amber-400' :
+                    batteryState === 'unknown' ? 'text-zinc-500' :
                     'text-emerald-400'
                   }
                 />
-                <span className="font-data text-sm font-medium text-white">{silo.sensor.battery}%</span>
+                <span className="font-data text-sm font-medium text-white">{formatBattery(silo.sensor.battery)}</span>
               </div>
             </div>
 
             {/* Signal */}
             <div className="flex items-center justify-between">
               <span className="text-sm text-zinc-400">Señal</span>
-              <span className="font-data text-sm text-white">{silo.sensor.signalStrength} dBm</span>
+              <span className="font-data text-sm text-white">
+                {silo.sensor.signalStrength !== null ? `${silo.sensor.signalStrength} dBm` : '—'}
+              </span>
             </div>
 
             {/* Last seen */}
@@ -268,18 +275,20 @@ export default function SiloDetailClient({ silo }: SiloDetailClientProps) {
             {/* Battery bar */}
             <div>
               <div className="h-2 rounded-full bg-white/5 overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${silo.sensor.battery}%` }}
-                  transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
-                  className="h-full rounded-full"
-                  style={{
-                    backgroundColor:
-                      batteryState === 'critical' ? '#dc2626' :
-                      batteryState === 'low' ? '#f59e0b' :
-                      '#16a34a',
-                  }}
-                />
+                {silo.sensor.battery !== null && (
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${silo.sensor.battery}%` }}
+                    transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
+                    className="h-full rounded-full"
+                    style={{
+                      backgroundColor:
+                        batteryState === 'critical' ? '#dc2626' :
+                        batteryState === 'low' ? '#f59e0b' :
+                        '#16a34a',
+                    }}
+                  />
+                )}
               </div>
             </div>
           </div>

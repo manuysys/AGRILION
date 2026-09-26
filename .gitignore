@@ -21,6 +21,10 @@ PaginaWeb/build/
 .env.production.local
 paginaweb/.env*
 PaginaWeb/.env*
+!paginaweb/.env.example
+!PaginaWeb/.env.example
+!Backend_Arduino/.env.example
+!Inteligencia_Artificial/.env.example
 
 # Secrets / tokens (nunca subir)
 *TOKEN*.txt
@@ -48,6 +52,10 @@ Thumbs.db
 __pycache__/
 *.pyc
 *.pyo
+
+# Backups de KiCad / modelos (no versionar)
+*-backups/
+*.zip
 
 # Vercel / Deploy
 .vercel/

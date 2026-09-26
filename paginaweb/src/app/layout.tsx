@@ -64,7 +64,7 @@ export const metadata: Metadata = {
     description: 'Sistema IoT para monitoreo en tiempo real de granos almacenados. Detectá deterioro antes de que ocurran pérdidas.',
     images: [
       {
-        url: '/api/og',
+        url: '/images/ICONO_AGRILION.png',
         width: 1200,
         height: 630,
         alt: 'Agrilion+ Dashboard',
@@ -75,13 +75,13 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Agrilion+ | Monitoreo Inteligente de Silobolsas',
     description: 'Sistema IoT para monitoreo en tiempo real de granos almacenados. Detectá deterioro antes de que ocurran pérdidas.',
-    images: ['/api/og'],
+    images: ['/images/ICONO_AGRILION.png'],
     creator: '@agrilion',
   },
   icons: {
     icon: '/favicon.ico',
     shortcut: '/favicon.ico',
-    apple: '/apple-touch-icon.png',
+    apple: '/images/ICONO_AGRILION.png',
   },
   manifest: '/site.webmanifest',
   alternates: {

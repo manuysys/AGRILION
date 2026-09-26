@@ -1,142 +1,83 @@
-from fastapi import FastAPI
-from sqlalchemy import create_engine, Column, Integer, String, Float
-from sqlalchemy.orm import sessionmaker, declarative_base
-from datetime import datetime
+"""
+AGRILION — Lanzador local de los bridges IoT
+=============================================
+
+Ejecuta los 3 procesos del backend en paralelo, cada uno en su propia consola:
+
+    1. TTN_MQTT.py                   → Bridge TTN → HiveMQ
+    2. MQTT_INFLUXDB_FIREBASE.py     → HiveMQ → InfluxDB + Firebase
+    3. mqtt_to_ai_bridge.py          → HiveMQ → AI API (/ingest)
+
+Uso:
+    cd Backend_Arduino
+    python main.py
+
+Requiere el .env completo (TTN, HiveMQ, InfluxDB, AI API).
+En Docker esto lo reemplaza supervisord.conf.
+"""
+
+import subprocess
+import sys
 import time
-import threading
-import random
+from pathlib import Path
 
-def auto_generate_data():
-    while True:
-        db = SessionLocal()
-        
-        new_data = SensorReading(
-            silo_id="A12",
-            temperature=random.uniform(20, 35),
-            humidity=random.uniform(10, 25),
-            co2=random.randint(1000, 1600),
-            presion=random.randint(900, 1100),
+# Consola Windows (cp1252) no soporta emojis: forzar UTF-8
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+SCRIPTS = [
+    "TTN_MQTT.py",
+    "MQTT_INFLUXDB_FIREBASE.py",
+    "mqtt_to_ai_bridge.py",
+]
+
+HERE = Path(__file__).resolve().parent
+
+
+def main() -> int:
+    print("=" * 60)
+    print("🚀 AGRILION — Lanzando bridges IoT")
+    print("=" * 60)
+
+    missing = [s for s in SCRIPTS if not (HERE / s).exists()]
+    if missing:
+        print(f"❌ Faltan archivos: {', '.join(missing)}")
+        return 1
+
+    processes: list[tuple[str, subprocess.Popen]] = []
+
+    for script in SCRIPTS:
+        print(f"   ▶ {script}")
+        proc = subprocess.Popen(
+            [sys.executable, str(HERE / script)],
+            cwd=str(HERE),
         )
+        processes.append((script, proc))
 
-        db.add(new_data)
-        db.commit()
-        db.close()
+    print("\n✅ 3 procesos corriendo. Ctrl+C para detenerlos todos.\n")
 
-        print("Dato guardado automáticamente")
-
-        time.sleep(120)  #cambiar cada cuanto acutaliza los datos
-
-app = FastAPI()
-
-DATABASE_URL = "sqlite:///./sensores.db"
-
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(bind=engine)
-
-Base = declarative_base()
-
-class SensorReading(Base):
-    __tablename__ = "sensor_readings"
-
-    id = Column(Integer, primary_key=True, index=True)
-    silo_id = Column(String)
-    temperature = Column(Float)
-    humidity = Column(Float)
-    co2 = Column(Float)
-    presion = Column(Float)
-    timestamp = Column(String, default=lambda: datetime.now().isoformat())
+    try:
+        while True:
+            time.sleep(2)
+            for script, proc in processes:
+                code = proc.poll()
+                if code is not None:
+                    print(f"⚠️ {script} terminó con código {code}. Deteniendo el resto...")
+                    raise KeyboardInterrupt
+    except KeyboardInterrupt:
+        print("\n🛑 Deteniendo procesos...")
+        for script, proc in processes:
+            if proc.poll() is None:
+                proc.terminate()
+        for script, proc in processes:
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        print("✅ Detenidos.")
+        return 0
 
 
-Base.metadata.create_all(bind=engine)
-
-
-@app.get("/")
-def home():
-    return {"message": "SMISIA backend con DB funcionando"}
-
-
-@app.post("/sensor-data")
-def receive_sensor_data(data: dict):
-    db = SessionLocal()
-
-    new_data = SensorReading(
-        silo_id=data.get("silo_id"),
-        temperature=data.get("temperature"),
-        humidity=data.get("humidity"),
-        co2=data.get("co2"),
-        presion=data.get("presion"),
-    )
-
-    db.add(new_data)
-    db.commit()
-    db.close()
-
-    return {"status": "saved in database"}
-
-# leer datos
-@app.get("/sensor-data")
-def get_data():
-    db = SessionLocal()
-    data = db.query(SensorReading).all()
-    db.close()
-
-    return [
-        {
-            "id": d.id,
-            "silo_id": d.silo_id,
-            "temperature": d.temperature,
-            "humidity": d.humidity,
-            "co2": d.co2,
-            "presion": d.presion,
-            "timestamp": d.timestamp
-        }
-        for d in data
-    ]
-
-@app.get("/silos/{silo_id}/status")
-def get_silo_status(silo_id: str):
-    db = SessionLocal()
-
-    
-    data = (
-        db.query(SensorReading)
-        .filter(SensorReading.silo_id == silo_id)
-        .order_by(SensorReading.id.desc())
-        .first()
-    )
-
-    db.close()
-
-    if not data:
-        return {"error": "No hay datos para este silo"}
-
-    if data.temperature > 30 or data.humidity > 20:
-        status = "alerta"
-    else:
-        status = "bien"
-
-    return {
-        "status": status,
-        "temperature": data.temperature,
-        "humidity": data.humidity
-    }
-
-@app.post("/predict")
-def predict(data: dict):
-    temperature = data.get("temperature")
-    humidity = data.get("humidity")
-    co2 = data.get("co2")
-    presion = data.get("presion")
-
-    if temperature > 35 or humidity > 20 or co2 > 1400 or presion > 1000:
-        status = "riesgo"
-    else:
-        status = "normal"
-
-    return {"status": status}
-
-@app.on_event("startup")
-def start_auto_data():
-    thread = threading.Thread(target=auto_generate_data)
-    thread.daemon = True
-    thread.start()
+if __name__ == "__main__":
+    sys.exit(main())

@@ -11,12 +11,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1,
     },
     {
-      url: `${baseUrl}/#flujo`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.8,
-    },
-    {
       url: `${baseUrl}/#tecnologia`,
       lastModified: new Date(),
       changeFrequency: 'monthly',
@@ -29,16 +23,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.9,
     },
     {
-      url: `${baseUrl}/login`,
+      url: `${baseUrl}/terminos`,
       lastModified: new Date(),
       changeFrequency: 'yearly',
-      priority: 0.5,
+      priority: 0.2,
     },
     {
-      url: `${baseUrl}/registro`,
+      url: `${baseUrl}/privacidad`,
       lastModified: new Date(),
       changeFrequency: 'yearly',
-      priority: 0.7,
+      priority: 0.2,
     },
   ];
 }

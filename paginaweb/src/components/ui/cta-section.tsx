@@ -34,12 +34,12 @@ export function CtaSection() {
             >
               Solicitar Demo Gratuita <ArrowRight className="w-5 h-5" />
             </Link>
-            <Link 
-              href="#contacto"
+            <a 
+              href="mailto:eest4.74.agrilion@gmail.com"
               className="bg-white/5 text-white border border-white/10 px-8 py-4 rounded-full font-bold text-lg hover:bg-white/10 transition-colors flex items-center justify-center"
             >
               Hablar con Ventas
-            </Link>
+            </a>
           </div>
         </div>
       </motion.div>

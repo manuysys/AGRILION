@@ -6,6 +6,7 @@
 
 import type { SiloBag, Alert, DashboardStats } from '@/types';
 import { mockSiloBags, mockAlerts, mockDashboardStats } from './mock-data';
+import { getRiskBand } from './thresholds';
 import {
   getSilosOverview,
   getSiloHistory,
@@ -23,20 +24,26 @@ function riskLevelToState(level: string): 'ok' | 'warn' | 'critical' {
 }
 
 function riskScoreToLabel(score: number): string {
-  if (score >= 70) return 'Crítico';
-  if (score >= 30) return 'Atención';
+  const band = getRiskBand(score);
+  if (band === 'danger') return 'Crítico';
+  if (band === 'warning') return 'Atención';
   return 'Estable';
 }
 
 function riskScoreToBand(score: number): 'normal' | 'warning' | 'danger' {
-  if (score >= 70) return 'danger';
-  if (score >= 30) return 'warning';
-  return 'normal';
+  return getRiskBand(score);
+}
+
+function capitalize(text: string): string {
+  if (!text) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /**
- * Mapear un SiloOverview de la API a un SiloBag completo del frontend.
- * Los campos que la API no provee se completan con defaults razonables.
+ * Mapear un SiloOverview de la API a un SiloBag del frontend.
+ *
+ * Solo se usan datos reales: lo que la API no provee queda como "sin dato"
+ * (no se inventan ubicación, batería, toneladas ni fechas).
  */
 function overviewToSiloBag(o: SiloOverview): SiloBag {
   const state = riskLevelToState(o.risk_level);
@@ -45,8 +52,8 @@ function overviewToSiloBag(o: SiloOverview): SiloBag {
   return {
     id: o.silo_id,
     name: `Silobolsa ${o.silo_id.replace('SILO_', 'SB-')}`,
-    location: 'Campo Principal',
-    grainType: 'Soja',
+    location: 'Sin ubicación',
+    grainType: o.grain_type ? capitalize(o.grain_type) : 'Sin dato',
     state,
     riskScore: {
       value: o.risk_score,
@@ -62,9 +69,9 @@ function overviewToSiloBag(o: SiloOverview): SiloBag {
     },
     sensor: {
       connection: 'online',
-      battery: 85,
+      battery: null,
       lastSeen: o.last_update || now,
-      signalStrength: -72,
+      signalStrength: null,
     },
     interpretation: {
       summary: state === 'ok'
@@ -77,15 +84,26 @@ function overviewToSiloBag(o: SiloOverview): SiloBag {
         : state === 'warn'
           ? 'Revisar en próximas 24 horas'
           : 'Sin acción requerida',
-      confidence: state === 'ok' ? 92 : state === 'warn' ? 78 : 65,
+      confidence: null,
       factors: [],
     },
     readings24h: [],
     alerts: [],
-    storedSince: '2025-06-01T00:00:00Z',
-    estimatedTons: 120,
+    storedSince: null,
+    estimatedTons: null,
   };
 }
+
+const EMPTY_STATS: DashboardStats = {
+  totalSilos: 0,
+  activeSensors: 0,
+  totalSensors: 0,
+  activeAlerts: 0,
+  criticalAlerts: 0,
+  averageBattery: 0,
+  lastGlobalUpdate: new Date().toISOString(),
+  systemHealth: 'ok',
+};
 
 // ─── Dashboard Stats ─────────────────────────────────────────────────────────
 export async function fetchDashboardStats(): Promise<DashboardStats> {
@@ -99,8 +117,11 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
 
     const totalSilos = silos.length;
     const onlineSilos = silos.filter(s => s.sensor.connection === 'online').length;
-    const avgBattery = silos.length > 0
-      ? Math.round(silos.reduce((acc, s) => acc + s.sensor.battery, 0) / silos.length)
+    const batteries = silos
+      .map(s => s.sensor.battery)
+      .filter((b): b is number => typeof b === 'number');
+    const avgBattery = batteries.length > 0
+      ? Math.round(batteries.reduce((acc, b) => acc + b, 0) / batteries.length)
       : 0;
 
     const criticalCount = silos.filter(s => s.state === 'critical').length;
@@ -121,7 +142,8 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
       systemHealth,
     };
   } catch {
-    return mockDashboardStats;
+    // En modo real no se inventan datos: se devuelve el estado vacío.
+    return EMPTY_STATS;
   }
 }
 
@@ -132,19 +154,10 @@ export async function fetchSilobags(): Promise<SiloBag[]> {
     return [...mockSiloBags].sort((a, b) => b.riskScore.value - a.riskScore.value);
   }
 
-  try {
-    const overview = await getSilosOverview();
-    if (overview.length === 0) {
-      console.warn('AI API returned no silos, falling back to mock');
-      return [...mockSiloBags].sort((a, b) => b.riskScore.value - a.riskScore.value);
-    }
-
-    const silos = overview.map(overviewToSiloBag);
-    return silos.sort((a, b) => b.riskScore.value - a.riskScore.value);
-  } catch {
-    console.warn('AI API failed, falling back to mock silos');
-    return [...mockSiloBags].sort((a, b) => b.riskScore.value - a.riskScore.value);
-  }
+  // Modo real: si la API falla o no hay datos, se devuelve vacío (sin mock).
+  const overview = await getSilosOverview();
+  const silos = overview.map(overviewToSiloBag);
+  return silos.sort((a, b) => b.riskScore.value - a.riskScore.value);
 }
 
 // ── Single Silo Detail ──
@@ -159,8 +172,7 @@ export async function fetchSiloDetail(id: string): Promise<SiloBag | null> {
     const siloOverview = overview.find(s => s.silo_id === id);
 
     if (!siloOverview) {
-      console.warn(`Silo ${id} not found in API, falling back to mock`);
-      return mockSiloBags.find((s) => s.id === id) ?? null;
+      return null;
     }
 
     const siloBag = overviewToSiloBag(siloOverview);
@@ -178,8 +190,7 @@ export async function fetchSiloDetail(id: string): Promise<SiloBag | null> {
 
     return siloBag;
   } catch {
-    console.warn(`Failed to fetch silo ${id} detail, using mock`);
-    return mockSiloBags.find((s) => s.id === id) ?? null;
+    return null;
   }
 }
 
@@ -257,16 +268,10 @@ export async function fetchAlerts(filter?: {
       filtered = filtered.filter((a) => a.acknowledged === filter.acknowledged);
     }
 
-    // Si no hay alertas de la API, fallback a mock
-    if (filtered.length === 0 && mockAlerts.length > 0) {
-      console.info('No alerts from API, using mock alerts');
-      return mockAlerts;
-    }
-
+    // Modo real: sin alertas reales => lista vacía (sin mock).
     return filtered;
   } catch {
-    console.warn('Failed to fetch alerts, using mock');
-    return mockAlerts;
+    return [];
   }
 }
 

@@ -6,12 +6,12 @@ import { LayoutDashboard, AlertTriangle, History, BrainCircuit } from 'lucide-re
 
 const navItems = [
   { href: '/dashboard', label: 'Resumen', icon: LayoutDashboard },
-  { href: '/dashboard/alerts', label: 'Alertas', icon: AlertTriangle, badge: 4 },
+  { href: '/dashboard/alerts', label: 'Alertas', icon: AlertTriangle },
   { href: '/dashboard/history', label: 'Histórico', icon: History },
   { href: '/dashboard/ia', label: 'IA', icon: BrainCircuit },
 ];
 
-export default function BottomNav() {
+export default function BottomNav({ alertCount = 0 }: { alertCount?: number }) {
   const pathname = usePathname();
 
   return (
@@ -27,6 +27,7 @@ export default function BottomNav() {
           const isActive = pathname === item.href ||
             (item.href !== '/dashboard' && pathname.startsWith(item.href));
           const Icon = item.icon;
+          const badge = item.href === '/dashboard/alerts' ? alertCount : 0;
 
           return (
             <Link
@@ -44,7 +45,7 @@ export default function BottomNav() {
             >
               <div className="relative">
                 <Icon size={22} strokeWidth={isActive ? 2.3 : 1.8} />
-                {item.badge && item.badge > 0 && (
+                {badge > 0 && (
                   <span className="
                     absolute -top-1 -right-2
                     flex items-center justify-center
@@ -52,7 +53,7 @@ export default function BottomNav() {
                     text-[9px] font-bold rounded-full
                     bg-[var(--state-critical)] text-white
                   ">
-                    {item.badge}
+                    {badge}
                   </span>
                 )}
               </div>

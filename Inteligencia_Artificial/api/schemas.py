@@ -182,6 +182,8 @@ class SiloOverviewItem(BaseModel):
     risk_score: int
     risk_level: str
     last_update: str
+    grain_type: Optional[str] = None
+    device_id: Optional[str] = None
 
 
 class SilosOverviewResponse(BaseModel):

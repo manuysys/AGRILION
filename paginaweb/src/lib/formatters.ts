@@ -1,5 +1,7 @@
 // Human-readable formatters for sensor data and timestamps
 
+import { THRESHOLDS } from './thresholds';
+
 /**
  * Format a relative time string in Spanish
  * e.g. "hace 2 min", "hace 3 h", "hace 2 días"
@@ -26,12 +28,11 @@ export function formatRelativeTime(isoString: string): string {
 export function getFreshnessColor(isoString: string): string {
   const now = new Date();
   const date = new Date(isoString);
-  const diffHr = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+  const diffMs = now.getTime() - date.getTime();
 
-  if (diffHr < 2) return 'text-gray-500';   // fresh
-  if (diffHr < 4) return 'text-amber-500';  // getting old
-  if (diffHr < 6) return 'text-orange-500'; // stale
-  return 'text-red-500';                     // very stale
+  if (diffMs < THRESHOLDS.sensorTimeout.delayed) return 'text-zinc-500'; // fresh
+  if (diffMs < THRESHOLDS.sensorTimeout.offline) return 'text-amber-500'; // retrasado
+  return 'text-red-500'; // sin señal
 }
 
 /**
@@ -63,9 +64,10 @@ export function formatRiskScore(value: number): string {
 }
 
 /**
- * Format battery percentage
+ * Format battery percentage (null = sin dato)
  */
-export function formatBattery(value: number): string {
+export function formatBattery(value: number | null): string {
+  if (value === null) return '—';
   return `${Math.round(value)}%`;
 }
 
@@ -101,11 +103,12 @@ export function formatChartTime(isoString: string): string {
 }
 
 /**
- * Format a full date in Spanish
+ * Format a full date + time in Spanish
+ * (toLocaleDateString ignora hour/minute; se usa toLocaleString)
  */
 export function formatFullDate(isoString: string): string {
   const date = new Date(isoString);
-  return date.toLocaleDateString('es-AR', {
+  return date.toLocaleString('es-AR', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',

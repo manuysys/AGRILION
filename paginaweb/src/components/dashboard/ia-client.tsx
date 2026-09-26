@@ -13,13 +13,6 @@ interface IAClientProps {
   alerts: Alert[];
 }
 
-const suggestedCommands = [
-  '¿Qué silos están en riesgo?',
-  'Resumen de la última semana',
-  '¿Cómo está el silo SILO_001?',
-  'Explicá las alertas activas',
-];
-
 // ─── Local fallback responses (when AI API is not available) ─────────────────
 
 function localFallbackResponse(query: string, silos: SiloBag[]): string {
@@ -35,11 +28,11 @@ function localFallbackResponse(query: string, silos: SiloBag[]): string {
   }
 
   if (q.includes('batería') || q.includes('battery')) {
-    const lowBatt = silos.filter((s) => s.sensor.battery < 50);
+    const lowBatt = silos.filter((s) => typeof s.sensor.battery === 'number' && s.sensor.battery < 50);
     if (lowBatt.length > 0) {
       return `Silos con batería baja: ${lowBatt.map(s => `${s.id} (${s.sensor.battery}%)`).join(', ')}. Recomiendo programar reemplazo de baterías en la próxima visita a campo.`;
     }
-    return 'Todas las baterías están en niveles aceptables (>50%).';
+    return 'No hay datos de batería reportados por los sensores.';
   }
 
   if (q.includes('resumen') || q.includes('semana') || q.includes('general')) {
@@ -85,12 +78,26 @@ export default function IAClient({ silos, alerts }: IAClientProps) {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [apiConnected, setApiConnected] = useState<boolean | null>(null); // null = checking
-  const [sessionId] = useState(() => `web-${Date.now()}`);
+  const sessionIdRef = useRef<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const suggestedCommands = [
+    '¿Qué silos están en riesgo?',
+    'Resumen de la última semana',
+    silos[0] ? `¿Cómo está el silo ${silos[0].id}?` : '¿Cómo está el sistema?',
+    'Explicá las alertas activas',
+  ];
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
+
+  // ID de sesión generado en el cliente (no durante el render)
+  useEffect(() => {
+    if (!sessionIdRef.current) {
+      sessionIdRef.current = `web-${Date.now()}`;
+    }
+  }, []);
 
   // Check if AI API is reachable on mount
   useEffect(() => {
@@ -120,7 +127,7 @@ export default function IAClient({ silos, alerts }: IAClientProps) {
         const apiResponse: ChatResponse | null = await sendChatMessage(
           query,
           undefined, // silo_id (optional)
-          sessionId
+          sessionIdRef.current || 'web-dashboard'
         );
 
         if (apiResponse && apiResponse.response) {

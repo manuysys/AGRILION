@@ -13,7 +13,7 @@ export default async function DashboardPage() {
   ]);
 
   const systemInterpretation = interpretSystem(silos);
-  const mostCritical = silos.find((s) => s.state === 'critical') ?? silos[0];
+  const mostCritical = silos.find((s) => s.state === 'critical') ?? silos[0] ?? null;
   const activeAlerts = alerts.filter((a) => !a.acknowledged);
 
   return (

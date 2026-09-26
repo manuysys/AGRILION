@@ -20,18 +20,19 @@ interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
-  badge?: number;
 }
 
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Resumen', icon: LayoutDashboard },
-  { href: '/dashboard/alerts', label: 'Alertas', icon: AlertTriangle, badge: 4 },
+  { href: '/dashboard/alerts', label: 'Alertas', icon: AlertTriangle },
   { href: '/dashboard/history', label: 'Histórico', icon: History },
   { href: '/dashboard/ia', label: 'Centro IA', icon: BrainCircuit },
   { href: '/dashboard/settings', label: 'Configuración', icon: Settings },
 ];
 
-export default function Sidebar() {
+const MOCK_MODE = process.env.NEXT_PUBLIC_MOCK_MODE !== 'false';
+
+export default function Sidebar({ alertCount = 0 }: { alertCount?: number }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -72,6 +73,7 @@ export default function Sidebar() {
           const isActive = pathname === item.href ||
             (item.href !== '/dashboard' && pathname.startsWith(item.href));
           const Icon = item.icon;
+          const badge = item.href === '/dashboard/alerts' ? alertCount : 0;
 
           return (
             <Link
@@ -116,17 +118,17 @@ export default function Sidebar() {
               </AnimatePresence>
 
               {/* Badge */}
-              {!collapsed && item.badge && item.badge > 0 && (
+              {!collapsed && badge > 0 && (
                 <span className="
                   relative z-10 flex items-center justify-center
                   min-w-[20px] h-5 px-1.5
                   text-[10px] font-bold rounded-full
                   bg-red-500 text-white
                 ">
-                  {item.badge}
+                  {badge}
                 </span>
               )}
-              {collapsed && item.badge && item.badge > 0 && (
+              {collapsed && badge > 0 && (
                 <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" />
               )}
             </Link>
@@ -149,7 +151,7 @@ export default function Sidebar() {
         {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
       </motion.button>
 
-      {/* Demo badge */}
+      {/* Modo de datos */}
       <AnimatePresence>
         {!collapsed && (
           <motion.div
@@ -159,8 +161,10 @@ export default function Sidebar() {
             className="mx-3 mb-4 px-3 py-2 rounded-lg bg-white/5 border border-white/10 overflow-hidden"
           >
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs text-white/60 font-medium">MODO DEMO</span>
+              <span className={`w-2 h-2 rounded-full animate-pulse ${MOCK_MODE ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+              <span className="text-xs text-white/60 font-medium">
+                {MOCK_MODE ? 'MODO DEMO' : 'DATOS REALES'}
+              </span>
             </div>
           </motion.div>
         )}

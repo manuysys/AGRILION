@@ -68,7 +68,7 @@ export default function StatusPill({
     <span
       className={`
         inline-flex items-center font-medium rounded-full border
-        ${c.bg} ${c.text} ${c.border} border-opacity-30
+        ${c.bg} ${c.text} ${c.border}
         ${sizeClasses[size]}
         ${state === 'critical' ? 'pulse-critical' : ''}
         ${className}

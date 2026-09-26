@@ -497,6 +497,8 @@ async def get_silos_overview():
             risk_score=int(s["risk_score"]),
             risk_level=s["risk_level"],
             last_update=s["last_update"],
+            grain_type=s.get("grain_type"),
+            device_id=s.get("device_id"),
         )
         for s in raw
     ]

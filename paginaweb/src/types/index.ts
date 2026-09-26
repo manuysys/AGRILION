@@ -11,9 +11,9 @@ export type SensorConnectionStatus = 'online' | 'delayed' | 'offline';
 
 export interface SensorStatus {
   connection: SensorConnectionStatus;
-  battery: number; // 0-100
+  battery: number | null; // 0-100 (null = el firmware no reporta batería)
   lastSeen: string; // ISO timestamp
-  signalStrength: number; // dBm
+  signalStrength: number | null; // dBm (null = sin dato)
 }
 
 // ── Health State ──
@@ -48,7 +48,7 @@ export interface RiskScore {
 export interface AIInterpretation {
   summary: string; // e.g. "Posible fermentación detectada"
   recommendation: string;
-  confidence: number; // 0-100
+  confidence: number | null; // 0-100 (null = sin estimación)
   factors: string[];
 }
 
@@ -66,8 +66,8 @@ export interface SiloBag {
   interpretation: AIInterpretation;
   readings24h: SensorReading[];
   alerts: Alert[];
-  storedSince: string; // ISO date
-  estimatedTons: number;
+  storedSince: string | null; // ISO date (null = sin dato)
+  estimatedTons: number | null;
 }
 
 // ── Dashboard Stats ──

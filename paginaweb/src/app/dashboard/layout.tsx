@@ -11,6 +11,9 @@ export const metadata: Metadata = {
   description: 'Panel de monitoreo en tiempo real de silobolsas',
 };
 
+// Dashboard siempre renderizado en el servidor con datos frescos
+export const dynamic = 'force-dynamic';
+
 export default async function DashboardLayout({
   children,
 }: {
@@ -36,7 +39,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-screen bg-black text-white selection:bg-emerald-500/30">
-      <Sidebar />
+      <Sidebar alertCount={stats.activeAlerts} />
 
       <div className="flex-1 flex flex-col min-w-0">
         <DashboardHeader
@@ -52,7 +55,7 @@ export default async function DashboardLayout({
         </main>
       </div>
 
-      <BottomNav />
+      <BottomNav alertCount={stats.activeAlerts} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getRiskBand, THRESHOLDS } from '@/lib/thresholds';
 
 interface RiskGaugeProps {
   value: number; // 0-100
@@ -16,14 +17,16 @@ const sizeConfig = {
 };
 
 function getColor(value: number): string {
-  if (value > 35) return 'var(--state-critical)';
-  if (value > 30) return 'var(--state-warn)';
+  const band = getRiskBand(value);
+  if (band === 'danger') return 'var(--state-critical)';
+  if (band === 'warning') return 'var(--state-warn)';
   return 'var(--state-ok)';
 }
 
 function getBandLabel(value: number): string {
-  if (value > 35) return 'Crítico';
-  if (value > 30) return 'Atención';
+  const band = getRiskBand(value);
+  if (band === 'danger') return 'Crítico';
+  if (band === 'warning') return 'Atención';
   return 'Estable';
 }
 
@@ -50,6 +53,11 @@ export default function RiskGauge({
   const radius = cx - cfg.strokeWidth;
   const circumference = Math.PI * radius;
   const progress = (animatedValue / 100) * circumference;
+
+  // Proporciones de las bandas (alineadas con THRESHOLDS.riskScore)
+  const normalPct = THRESHOLDS.riskScore.normal.max / 100; // 0-30
+  const warnPct = (THRESHOLDS.riskScore.warning.max - THRESHOLDS.riskScore.warning.min) / 100; // 30-70
+  const dangerPct = 1 - normalPct - warnPct; // 70-100
 
   const arcPath = `
     M ${cfg.strokeWidth} ${cy}
@@ -80,29 +88,29 @@ export default function RiskGauge({
           stroke="var(--state-ok)"
           strokeWidth={cfg.strokeWidth}
           strokeLinecap="round"
-          strokeDasharray={`${0.30 * circumference} ${circumference}`}
+          strokeDasharray={`${normalPct * circumference} ${circumference}`}
           opacity={0.15}
         />
 
-        {/* Yellow band (30-35) */}
+        {/* Yellow band (30-70) */}
         <path
           d={arcPath}
           fill="none"
           stroke="var(--state-warn)"
           strokeWidth={cfg.strokeWidth}
-          strokeDasharray={`${0.05 * circumference} ${circumference}`}
-          strokeDashoffset={`${-0.30 * circumference}`}
+          strokeDasharray={`${warnPct * circumference} ${circumference}`}
+          strokeDashoffset={`${-normalPct * circumference}`}
           opacity={0.15}
         />
 
-        {/* Red band (35-100) */}
+        {/* Red band (70-100) */}
         <path
           d={arcPath}
           fill="none"
           stroke="var(--state-critical)"
           strokeWidth={cfg.strokeWidth}
-          strokeDasharray={`${0.65 * circumference} ${circumference}`}
-          strokeDashoffset={`${-0.35 * circumference}`}
+          strokeDasharray={`${dangerPct * circumference} ${circumference}`}
+          strokeDashoffset={`${-(normalPct + warnPct) * circumference}`}
           opacity={0.15}
         />
 

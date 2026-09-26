@@ -9,13 +9,19 @@ Para ejecutar:
     uvicorn api.app:app --reload --port 8000
 """
 
+import os
 import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
 import logging
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# Cargar .env ANTES de importar módulos que leen variables de entorno
+# (InfluxDB, Firebase, Groq/OpenRouter, etc.)
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 # Asegurar imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -52,9 +58,12 @@ app = FastAPI(
 )
 
 # CORS
+_cors_origins = os.getenv(
+    "API_CORS_ORIGINS", "http://localhost:3000,http://localhost:19006"
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[o.strip() for o in _cors_origins.split(",") if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

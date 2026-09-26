@@ -20,9 +20,11 @@ export const THRESHOLDS = {
     unit: 'ppm',
   },
   riskScore: {
+    // Alineado con el motor de riesgo de la AI API y el processor MQTT
+    // (NORMAL < 30, WARNING 30-70, CRITICAL >= 70)
     normal: { min: 0, max: 30 },
-    warning: { min: 30, max: 35 },
-    danger: { min: 35, max: 100 },
+    warning: { min: 30, max: 70 },
+    danger: { min: 70, max: 100 },
   },
   battery: {
     ok: { min: 40, max: 100 },
@@ -54,12 +56,15 @@ export function getCO2State(value: number): 'ok' | 'warn' | 'critical' {
 }
 
 export function getRiskBand(score: number): 'normal' | 'warning' | 'danger' {
-  if (score > THRESHOLDS.riskScore.warning.max) return 'danger';
-  if (score > THRESHOLDS.riskScore.normal.max) return 'warning';
+  if (score >= THRESHOLDS.riskScore.danger.min) return 'danger';
+  if (score >= THRESHOLDS.riskScore.warning.min) return 'warning';
   return 'normal';
 }
 
-export function getBatteryState(level: number): 'ok' | 'low' | 'critical' {
+export function getBatteryState(
+  level: number | null
+): 'ok' | 'low' | 'critical' | 'unknown' {
+  if (level === null) return 'unknown';
   if (level < THRESHOLDS.battery.critical.max) return 'critical';
   if (level < THRESHOLDS.battery.low.max) return 'low';
   return 'ok';

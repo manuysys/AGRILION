@@ -145,7 +145,8 @@ class ChatbotService:
         context = context_override or self._fetch_context(silo_id)
 
         # Cache check (skip for high-risk states — always generate fresh)
-        if self._cache and context.get("risk_score", 0) < 60:
+        risk_score = context.get("risk_score") or 0
+        if self._cache and risk_score < 60:
             cached = self._cache.get(message, context)
             if cached:
                 return ChatResponse(
@@ -232,23 +233,69 @@ class ChatbotService:
     # ─── Private ─────────────────────────────────────────────────────────────
 
     def _fetch_context(self, silo_id: str) -> dict:
-        """Fetch live context from AIService, or return empty context."""
+        """
+        Fetch live context for a silo.
+
+        1. Últimas lecturas reales del repositorio (InfluxDB o InMemory).
+        2. Análisis completo (LSTM + anomalías) si hay historia suficiente.
+        3. Si no hay 24 lecturas, score rápido con el motor de riesgo.
+        """
+        sensor_values: Optional[dict] = None
+        risk_score: Optional[int] = None
+        risk_level: Optional[str] = None
+        alerts: list = []
+        predictions: dict = {}
+        anomalies: dict = {}
+
         if self.ai_service:
+            # 1) Lecturas reales
+            try:
+                df = self.ai_service.repo.get_recent_readings(silo_id, n=5)
+                if not df.empty:
+                    last = df.iloc[-1]
+                    sensor_values = {
+                        "temperature": float(last.get("temperature", 0)),
+                        "humidity": float(last.get("humidity", 0)),
+                        "co2": float(last.get("co2", 0)),
+                    }
+            except Exception as e:
+                logger.warning(f"Could not fetch readings for {silo_id}: {e}")
+
+            # 2) Análisis completo (requiere >= seq_length lecturas)
             try:
                 result = self.ai_service.analyze_batch(silo_id)
                 if result:
-                    return build_system_context(
-                        silo_id=silo_id,
-                        sensor_values=None,
-                        risk_score=result.risk_score,
-                        risk_level=result.risk_level,
-                        alerts=result.alerts,
-                        predictions=result.predictions,
-                        anomalies=result.anomalies,
-                    )
+                    risk_score = result.risk_score
+                    risk_level = result.risk_level
+                    alerts = result.alerts
+                    predictions = result.predictions
+                    anomalies = result.anomalies
+                elif sensor_values:
+                    # 3) Sin historia suficiente: score/alertas con reglas
+                    factors = self.ai_service.risk_engine.get_risk_factors(sensor_values)
+                    risk_score = factors["total_score"]
+                    risk_level = factors["level"]
+                    alerts = [
+                        {
+                            "level": a.level,
+                            "category": a.category,
+                            "message": a.message,
+                            "recommendation": a.recommendation,
+                        }
+                        for a in self.ai_service.alert_system.generate_alerts(factors)
+                    ]
             except Exception as e:
                 logger.warning(f"Live context fetch failed for {silo_id}: {e}")
-        return build_system_context(silo_id=silo_id)
+
+        return build_system_context(
+            silo_id=silo_id,
+            sensor_values=sensor_values,
+            risk_score=risk_score,
+            risk_level=risk_level,
+            alerts=alerts,
+            predictions=predictions,
+            anomalies=anomalies,
+        )
 
     def _get_builder(self, silo_id: str, context: dict) -> PromptBuilder:
         if silo_id not in self._builders:

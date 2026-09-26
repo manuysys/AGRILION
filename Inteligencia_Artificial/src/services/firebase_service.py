@@ -311,10 +311,26 @@ class FirebaseService:
         if not self.is_available:
             raise RuntimeError("Firebase no disponible")
 
+        # Tipo de grano del silo (para umbrales del motor de riesgo)
+        grain_type = ""
+        try:
+            silo_doc = (
+                self._db.collection("users")
+                .document(owner_uid)
+                .collection("silos")
+                .document(silo_id)
+                .get()
+            )
+            if silo_doc.exists:
+                grain_type = (silo_doc.to_dict() or {}).get("grainType", "") or ""
+        except Exception:
+            pass
+
         sensor_data = {
             "deviceId": device_id,
             "active": True,
             "battery": int(battery),
+            "grainType": grain_type,
             "installedAt": firestore.SERVER_TIMESTAMP,
             "lastSeen": firestore.SERVER_TIMESTAMP,
         }
@@ -338,6 +354,7 @@ class FirebaseService:
             "ownerUid": owner_uid,
             "siloId": silo_id,
             "siloPath": silo_path,
+            "grainType": grain_type,
             "active": True,
             "lastSeen": firestore.SERVER_TIMESTAMP,
         })

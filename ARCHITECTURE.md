@@ -104,7 +104,7 @@
 ### Backend_Arduino/.env
 ```env
 TTN_BROKER=eu1.cloud.thethings.network
-TTN_PORT=1883
+TTN_PORT=8883
 TTN_USER=tu_app_id@ttn
 TTN_PASS=tu_api_key
 

@@ -1,10 +1,16 @@
 import json
 import ssl
 import os
+import sys
 import time
 from dotenv import load_dotenv
 # pyrefly: ignore [missing-import]
 from paho.mqtt import client as mqtt_client
+
+# Consola Windows (cp1252) no soporta emojis: forzar UTF-8
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # =========================
 # CARGAR VARIABLES
@@ -12,10 +18,12 @@ from paho.mqtt import client as mqtt_client
 load_dotenv()
 
 TTN_BROKER = os.getenv("TTN_BROKER")
-TTN_PORT = int(os.getenv("TTN_PORT"))
+TTN_PORT = int(os.getenv("TTN_PORT", "1883"))
 TTN_USER = os.getenv("TTN_USER")
 TTN_PASS = os.getenv("TTN_PASS")
-TTN_TOPIC = f"v3/{TTN_USER}/devices/+/up"
+# El topic de TTN usa el application_id SIN el sufijo "@ttn" del usuario MQTT.
+TTN_APP_ID = os.getenv("TTN_APP_ID") or (TTN_USER or "").split("@")[0]
+TTN_TOPIC = f"v3/{TTN_APP_ID}/devices/+/up"
 
 HIVEMQ_BROKER = os.getenv("HIVEMQ_BROKER")
 HIVEMQ_PORT = int(os.getenv("HIVEMQ_PORT"))

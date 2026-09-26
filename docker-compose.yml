@@ -20,8 +20,6 @@
 #   - HiveMQ credentials (para backend)
 # =============================================================================
 
-version: '3.8'
-
 services:
   # ─── AI API (FastAPI) ───────────────────────────────────────────────────────
   ai-api:
@@ -96,19 +94,28 @@ services:
   influxdb:
     image: influxdb:3-core
     container_name: agrilion-influxdb3
+    command:
+      - "--node-id"
+      - "agrilion"
+      - "--object-store"
+      - "file"
+      - "--data-dir"
+      - "/var/lib/influxdb3"
+      - "--plugin-dir"
+      - "/plugins"
+      - "--disable-authz"
+      - "health,ping,metrics,ready"
     ports:
       - "8181:8181"     # HTTP API
       - "8182:8182"     # gRPC (Flight)
     volumes:
       - influxdb3-data:/var/lib/influxdb3
       - influxdb3-plugins:/plugins
-    environment:
-      - INFLUXDB3_HTTP_BIND=0.0.0.0:8181
     restart: unless-stopped
     networks:
       - agrilion-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8181/api/v2/ping || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8181/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5

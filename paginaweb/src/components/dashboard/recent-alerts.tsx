@@ -26,7 +26,7 @@ export default function RecentAlerts({ alerts }: RecentAlertsProps) {
             transition-colors duration-300 cursor-pointer
           "
         >
-          Ver Historial
+          Ver Alertas
           <ArrowRight size={16} />
         </Link>
       </div>
