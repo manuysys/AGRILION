@@ -34,7 +34,7 @@ uint32_t appTxDutyCycle = 20000;
 // ================== Sensores ==================
 Adafruit_BME280 bme;
 Adafruit_SHT31  sht30 = Adafruit_SHT31();
-SCD4x           scd41;
+SCD4x           scd41(SCD4x_SENSOR_SCD41);
 Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
 
 #define PIN_INTERRUPCION GPIO5
@@ -109,20 +109,30 @@ void prepareTxFrame(uint8_t port)
   float hum  = sht30.readHumidity();
   float pres = bme.readPressure() / 100.0F;
 
+  // ================== CO2 (SCD41) ==================
+  // Modo single-shot: hay que esperar ~5s a que el dato esté listo.
+  // La librería devuelve TRUE cuando hay medición fresca (ver Example8).
   uint16_t co2 = 0;
-  scd41.measureSingleShot();
-  
   bool medicionLista = false;
-  for (int i = 0; i < 13; i++) {
-    delay(500);
-      // En esta librería, false significa lectura exitosa sin error
-    if (scd41.readMeasurement() == false) {
-      co2 = scd41.getCO2();
-      medicionLista = true;
-      break;
-    }
+
+  // Compensación de presión (BME280 en hPa -> librería en Pa)
+  if (!isnan(pres) && pres > 0) {
+    scd41.setAmbientPressure(pres * 100.0F);
   }
-  
+
+  if (scd41.measureSingleShot()) {
+    for (int i = 0; i < 13; i++) {
+      delay(500);
+      if (scd41.readMeasurement()) {
+        co2 = scd41.getCO2();
+        medicionLista = true;
+        break;
+      }
+    }
+  } else {
+    Serial.println("WARNING: SCD41 no aceptó measureSingleShot");
+  }
+
   if (!medicionLista) {
     Serial.println("WARNING: SCD41 sin datos en 6.5s");
   }
@@ -176,7 +186,10 @@ void setup()
   }
 
   // SCD41
-  if (!scd41.begin(Wire)) {
+  // measBegin=false: no arrancar medición periódica (usamos single-shot)
+  // autoCalibrate=true, skipStopPeriodicMeasurements=false (detiene una
+  // periódica previa si el sensor venía midiendo)
+  if (!scd41.begin(Wire, false)) {
     Serial.println("WARNING: SCD41 no detectado en setup.");
   }
   delay(600);
