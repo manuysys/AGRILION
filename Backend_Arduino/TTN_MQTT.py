@@ -21,9 +21,9 @@ TTN_BROKER = os.getenv("TTN_BROKER")
 TTN_PORT = int(os.getenv("TTN_PORT", "1883"))
 TTN_USER = os.getenv("TTN_USER")
 TTN_PASS = os.getenv("TTN_PASS")
-# El topic de TTN usa el application_id SIN el sufijo "@ttn" del usuario MQTT.
-TTN_APP_ID = os.getenv("TTN_APP_ID") or (TTN_USER or "").split("@")[0]
-TTN_TOPIC = f"v3/{TTN_APP_ID}/devices/+/up"
+# El topic incluye el tenant: v3/{app_id}@ttn/devices/+/up
+# (en TTN Sandbox/Cloud el AppID se publica con el sufijo @ttn del usuario).
+TTN_TOPIC = os.getenv("TTN_TOPIC") or f"v3/{TTN_USER}/devices/+/up"
 
 HIVEMQ_BROKER = os.getenv("HIVEMQ_BROKER")
 HIVEMQ_PORT = int(os.getenv("HIVEMQ_PORT"))

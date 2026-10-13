@@ -96,7 +96,7 @@ def main() -> int:
 
     ttn_user = env.get("TTN_USER", "")
     ttn_pass = env.get("TTN_PASS", "")
-    ttn_app = env.get("TTN_APP_ID", "")
+    ttn_topic = env.get("TTN_TOPIC") or f"v3/{ttn_user}/devices/+/up"
 
     ok_ttn = test_connection(
         "TTN",
@@ -104,7 +104,7 @@ def main() -> int:
         int(env.get("TTN_PORT", "8883")),
         ttn_user,
         ttn_pass,
-        f"v3/{ttn_app}/devices/+/up",
+        ttn_topic,
     )
 
     ok_hive = test_connection(

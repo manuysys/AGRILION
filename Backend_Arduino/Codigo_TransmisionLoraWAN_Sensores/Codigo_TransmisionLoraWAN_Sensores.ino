@@ -39,9 +39,16 @@ Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
 
 #define PIN_INTERRUPCION GPIO5
 
+// CO2 (SCD41): el sensor físico actual no acepta single-shot (NACK), así que
+// el payload va con co2=0. Poner en 0 para no intentar leerlo (menos ruido
+// serie); con un SCD41 sano, en 1 funciona directo.
+#define AGRILION_CO2 1
+
 volatile bool flag_interrupcion  = false;
 bool     impactoPendiente        = false;
 uint16_t aceleracionGuardada     = 0;
+
+TimerEvent_t agrilionWatchdog;
 
 // ================== CONFIGURAR ADXL345 ==================
 void configurarADXL345()
@@ -100,19 +107,74 @@ void ISR_Movimiento()
   flag_interrupcion = true;
 }
 
+// ================== WATCHDOG DE JOIN ==================
+// Si no hay gateway escuchando, el primer intento (FSB2) falla y el stack
+// reintenta por diseño en FSB1 (915.2), donde el gateway nunca escucha.
+// Solución: si a los 150s sigue sin unir, reiniciar la placa; al volver el
+// gateway, el primer intento en FSB2 acierta y el device se auto-recupera.
+static void AgrilionWatchdogCallback(void)
+{
+  if (IsLoRaMacNetworkJoined)
+  {
+    return;   // ya unido: no hace falta seguir vigilando
+  }
+
+  if (TimerGetCurrentTime() > 150000UL)
+  {
+    Serial.println("WATCHDOG: join sin exito 150s, reiniciando placa...");
+    delay(100);
+    CySoftwareReset();
+  }
+
+  TimerSetValue(&agrilionWatchdog, 30000);
+  TimerStart(&agrilionWatchdog);
+}
+
 // ================== PAYLOAD ==================
 void prepareTxFrame(uint8_t port)
 {
+  // Los sensores se alimentan SOLO durante la lectura y se apagan antes de
+  // transmitir: con el riel cargado la radio entra en Tx Timeout.
+  // Se libera el bus I2C y se deja asentar la alimentación (POR limpio);
+  // con el bus en 0 mientras están apagados no hay alimentación fantasma.
+  pinMode(SDA, INPUT);
+  pinMode(SCL, INPUT);
+  digitalWrite(Vext, LOW);
+  delay(1500);
+
+  Wire.begin();          // reinicia el controlador I2C tras el corte de energía
   Wire.setClock(50000);
 
-  float temp = sht30.readTemperature();
-  float hum  = sht30.readHumidity();
-  float pres = bme.readPressure() / 100.0F;
+  configurarADXL345();   // el ADXL pierde su config al cortarle la energía
+
+  // SHT30 (temp/humedad) con reintentos
+  float temp = NAN, hum = NAN;
+  for (int i = 0; i < 3 && (isnan(temp) || isnan(hum)); i++) {
+    temp = sht30.readTemperature();
+    hum  = sht30.readHumidity();
+    if (isnan(temp) || isnan(hum)) {
+      sht30.begin(0x44);   // re-init tras el corte de energía
+      delay(150);
+    }
+  }
+  Serial.printf("[SHT30] t=%.2f h=%.2f\n", temp, hum);
+
+  // BME280 (presión) con reintentos y validación de rango
+  float pres = NAN;
+  for (int i = 0; i < 3 && (isnan(pres) || pres < 300 || pres > 1100); i++) {
+    bme.begin(0x76) || bme.begin(0x77);   // recalibrar tras el corte
+    delay(100);
+    float p = bme.readPressure() / 100.0F;
+    if (!isnan(p) && p >= 300 && p <= 1100) pres = p;
+    else delay(150);
+  }
+  Serial.printf("[BME280] p=%.2f\n", pres);
 
   // ================== CO2 (SCD41) ==================
   // Modo single-shot: hay que esperar ~5s a que el dato esté listo.
   // La librería devuelve TRUE cuando hay medición fresca (ver Example8).
   uint16_t co2 = 0;
+#if AGRILION_CO2
   bool medicionLista = false;
 
   // Compensación de presión (BME280 en hPa -> librería en Pa)
@@ -136,11 +198,20 @@ void prepareTxFrame(uint8_t port)
   if (!medicionLista) {
     Serial.println("WARNING: SCD41 sin datos en 6.5s");
   }
+#endif
 
   if (!impactoPendiente) {
     float inst = leerAcelerometroInstantaneo();
     aceleracionGuardada = (uint16_t)(inst * 10);
   }
+
+  // Apagar los sensores ANTES de transmitir (radio limpia) y descargar el
+  // bus I2C para evitar que queden alimentados fantasma por SDA/SCL.
+  digitalWrite(Vext, HIGH);
+  Wire.end();
+  pinMode(SDA, OUTPUT); digitalWrite(SDA, LOW);
+  pinMode(SCL, OUTPUT); digitalWrite(SCL, LOW);
+  delay(20);
 
   int16_t t = isnan(temp) ? 0 : (int16_t)(temp * 100);
   int16_t h = isnan(hum)  ? 0 : (int16_t)(hum  * 100);
@@ -186,12 +257,14 @@ void setup()
   }
 
   // SCD41
+#if AGRILION_CO2
   // measBegin=false: no arrancar medición periódica (usamos single-shot)
   // autoCalibrate=true, skipStopPeriodicMeasurements=false (detiene una
   // periódica previa si el sensor venía midiendo)
   if (!scd41.begin(Wire, false)) {
     Serial.println("WARNING: SCD41 no detectado en setup.");
   }
+#endif
   delay(600);
 
   configurarADXL345();
@@ -199,18 +272,61 @@ void setup()
   pinMode(PIN_INTERRUPCION, INPUT_PULLDOWN);
   attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPCION), ISR_Movimiento, RISING);
 
+  // ---- Diagnóstico: probar la secuencia de ventana de sensores del frame ----
+  // (apagado -> descarga del bus -> encendido -> lectura), igual que en
+  // prepareTxFrame. Sirve para verificar los valores sin gateway.
+  digitalWrite(Vext, HIGH);
+  Wire.end();
+  pinMode(SDA, OUTPUT); digitalWrite(SDA, LOW);
+  pinMode(SCL, OUTPUT); digitalWrite(SCL, LOW);
+  delay(1000);
+  pinMode(SDA, INPUT); pinMode(SCL, INPUT);
+  digitalWrite(Vext, LOW);
+  delay(1500);
+  Wire.begin();
+  Wire.setClock(50000);
+  configurarADXL345();
+  {
+    float t2 = sht30.readTemperature();
+    float h2 = sht30.readHumidity();
+    bme.begin(0x76) || bme.begin(0x77);
+    float p2 = bme.readPressure() / 100.0F;
+    Serial.printf("[TEST-VENTANA] t=%.2f h=%.2f p=%.2f\n", t2, h2, p2);
+  }
+  digitalWrite(Vext, HIGH);
+  Wire.end();
+  pinMode(SDA, OUTPUT); digitalWrite(SDA, LOW);
+  pinMode(SCL, OUTPUT); digitalWrite(SCL, LOW);
+  // ---------------------------------------------------------------------------
+
+  // Sensores apagados durante toda la actividad de radio (join incluido).
+  // Con LORAWAN_RGB=0 la librería no toca Vext: lo controlamos 100% nosotros.
+  digitalWrite(Vext, HIGH);
+
+  TimerInit(&agrilionWatchdog, AgrilionWatchdogCallback);
+  TimerSetValue(&agrilionWatchdog, 30000);
+  TimerStart(&agrilionWatchdog);
+
   deviceState = DEVICE_STATE_INIT;
 }
 
 // ================== LOOP ==================
+unsigned long ultimoImpacto = 0;
+
 void loop()
 {
   if (flag_interrupcion)
   {
     flag_interrupcion = false;
-    float valorImpacto  = leerAcelerometroInstantaneo();
-    aceleracionGuardada = (uint16_t)(valorImpacto * 10);
-    impactoPendiente    = true;
+    float valorImpacto = leerAcelerometroInstantaneo();
+
+    // Debounce: solo impactos reales (>1.5 m/s²) y máximo uno cada 30s
+    // (el ADXL con Vext siempre encendido puede disparar en ráfaga).
+    if (valorImpacto > 1.5 && (millis() - ultimoImpacto > 30000)) {
+      aceleracionGuardada = (uint16_t)(valorImpacto * 10);
+      impactoPendiente    = true;
+      ultimoImpacto       = millis();
+    }
   }
 
   if (impactoPendiente && deviceState == DEVICE_STATE_SLEEP)

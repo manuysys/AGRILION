@@ -49,8 +49,7 @@ def main() -> int:
     port = int(env.get("TTN_PORT", "8883"))
     user = env.get("TTN_USER", "")
     password = env.get("TTN_PASS", "")
-    app_id = env.get("TTN_APP_ID", "")
-    topic = f"v3/{app_id}/devices/+/up"
+    topic = env.get("TTN_TOPIC") or f"v3/{user}/devices/+/up"
 
     print("=" * 64)
     print(f"AGRILION — Escuchando TTN {args.seconds}s")
