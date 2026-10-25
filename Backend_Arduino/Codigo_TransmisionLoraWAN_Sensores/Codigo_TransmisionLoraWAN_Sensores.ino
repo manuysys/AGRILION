@@ -45,10 +45,10 @@ bool scd41_initialized = false;
 #define AGRILION_CO2 1
 
 // Tiempo de estabilización del SCD41 antes de medir. El datasheet recomienda
-// varios minutos tras un power-up; 30 s es un compromiso razonable para no
-// consumir demasiada batería. Con esto se evita que cada lectura arranque
-// desde un estado frío y varíe demasiado.
-#define AGRILION_CO2_WARMUP_MS 30000
+// 3 minutos tras un power-up para alcanzar la precisión especificada.
+// Con 30 s las lecturas quedaban altas/inestables; se usa el valor del
+// datasheet. El costo es un ciclo de transmisión más largo.
+#define AGRILION_CO2_WARMUP_MS 180000
 
 volatile bool flag_interrupcion  = false;
 bool     impactoPendiente        = false;
