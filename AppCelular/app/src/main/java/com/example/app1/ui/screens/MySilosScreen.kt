@@ -1,5 +1,7 @@
 package com.example.app1.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,11 +19,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.app1.data.EstadoSilo
 import com.example.app1.data.SilosDataManagerBaseDeDatos
 import com.example.app1.data.AppStateBaseDeDatos
 import com.example.app1.data.SilobolsaBaseDeDatos
+import com.example.app1.ui.theme.AgrilionTokens
 
 @Composable
 fun MySilosScreen(onSiloClick: (String) -> Unit) {
@@ -35,14 +39,27 @@ fun MySilosScreen(onSiloClick: (String) -> Unit) {
         silosList.filter { it.nombre.contains(searchQuery, ignoreCase = true) || it.id.contains(searchQuery) }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AgrilionTokens.SurfaceDarkRoot)
+            .padding(16.dp)
+    ) {
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text(AppStateBaseDeDatos.t("Busca tu silobolsa")) },
-            trailingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            shape = RoundedCornerShape(24.dp)
+            label = { Text(AppStateBaseDeDatos.t("Busca tu silobolsa"), color = AgrilionTokens.Zinc400) },
+            trailingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AgrilionTokens.Zinc400) },
+            shape = RoundedCornerShape(24.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedBorderColor = AgrilionTokens.Emerald500,
+                unfocusedBorderColor = AgrilionTokens.BorderSubtle,
+                focusedContainerColor = AgrilionTokens.SurfaceDark1,
+                unfocusedContainerColor = AgrilionTokens.SurfaceDark1
+            )
         )
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -55,7 +72,7 @@ fun MySilosScreen(onSiloClick: (String) -> Unit) {
                 Text(
                     text = "No hay silobolsas registradas",
                     style = MaterialTheme.typography.bodyLarge,
-                    color = Color.Gray
+                    color = AgrilionTokens.Zinc400
                 )
             }
         } else {
@@ -81,11 +98,16 @@ fun SiloCardWithMenu(silo: SilobolsaBaseDeDatos, onSiloClick: () -> Unit, onDele
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
+            .border(
+                width = 1.dp,
+                color = if (silo.estado == EstadoSilo.CRITICO) AgrilionTokens.Critical else AgrilionTokens.BorderSubtle,
+                shape = AgrilionTokens.RadiusCard
+            )
             .clickable { onSiloClick() },
+        shape = AgrilionTokens.RadiusCard,
         colors = CardDefaults.cardColors(
-            containerColor = if (silo.estado == EstadoSilo.CRITICO) Color(0xFFFFEBEE) else Color.White
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            containerColor = if (silo.estado == EstadoSilo.CRITICO) AgrilionTokens.CriticalBg else AgrilionTokens.SurfaceDark1
+        )
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -95,19 +117,28 @@ fun SiloCardWithMenu(silo: SilobolsaBaseDeDatos, onSiloClick: () -> Unit, onDele
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = silo.nombre,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (silo.estado == EstadoSilo.CRITICO) Color.Red else Color.Unspecified
+                    color = Color.White
                 )
-                Text("${AppStateBaseDeDatos.t("Grano")}: ${AppStateBaseDeDatos.t(silo.tipoGrano)}")
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "${AppStateBaseDeDatos.t("Grano")}: ${AppStateBaseDeDatos.t(silo.tipoGrano)}",
+                    color = AgrilionTokens.Zinc400,
+                    fontSize = 13.sp
+                )
                 if (silo.ubicacion.isNotBlank()) {
-                    Text("${AppStateBaseDeDatos.t("Ubicación")}: ${silo.ubicacion}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    Text(
+                        text = "${AppStateBaseDeDatos.t("Ubicación")}: ${silo.ubicacion}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AgrilionTokens.Zinc500
+                    )
                 }
             }
 
             Box {
                 IconButton(onClick = { showMenu = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Opciones")
+                    Icon(Icons.Default.MoreVert, contentDescription = "Opciones", tint = AgrilionTokens.Zinc400)
                 }
                 DropdownMenu(
                     expanded = showMenu,
@@ -121,7 +152,7 @@ fun SiloCardWithMenu(silo: SilobolsaBaseDeDatos, onSiloClick: () -> Unit, onDele
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text(AppStateBaseDeDatos.t("Eliminar"), color = Color.Red) },
+                        text = { Text(AppStateBaseDeDatos.t("Eliminar"), color = AgrilionTokens.Critical) },
                         onClick = { 
                             showMenu = false
                             onDelete() 
@@ -158,13 +189,20 @@ fun EditSiloDialog(silo: SilobolsaBaseDeDatos, onDismiss: () -> Unit, onConfirm:
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = Color.White
+            shape = AgrilionTokens.RadiusCard,
+            color = AgrilionTokens.SurfaceDark1,
+            border = androidx.compose.foundation.BorderStroke(1.dp, AgrilionTokens.BorderSubtle)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(AppStateBaseDeDatos.t("Editar Silobolsa"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = null) }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        AppStateBaseDeDatos.t("EDITAR SILOBOLSA"),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        letterSpacing = (-0.5).sp
+                    )
+                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = null, tint = AgrilionTokens.Zinc400) }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -172,28 +210,43 @@ fun EditSiloDialog(silo: SilobolsaBaseDeDatos, onDismiss: () -> Unit, onConfirm:
                 OutlinedTextField(
                     value = nombreSilo,
                     onValueChange = { nombreSilo = it },
-                    label = { Text(AppStateBaseDeDatos.t("Nombre")) },
+                    label = { Text(AppStateBaseDeDatos.t("Nombre"), color = AgrilionTokens.Zinc400) },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = AgrilionTokens.Emerald500,
+                        unfocusedBorderColor = AgrilionTokens.BorderSubtle
+                    )
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // REQUERIMIENTO 1: AÑADIDO EDITAR UBICACIÓN
                 OutlinedTextField(
                     value = ubicacionSilo,
                     onValueChange = { ubicacionSilo = it },
-                    label = { Text(AppStateBaseDeDatos.t("Ubicación")) },
+                    label = { Text(AppStateBaseDeDatos.t("Ubicación"), color = AgrilionTokens.Zinc400) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    trailingIcon = { Icon(Icons.Default.Map, contentDescription = null, tint = Color.Gray) }
+                    trailingIcon = { Icon(Icons.Default.Map, contentDescription = null, tint = AgrilionTokens.Zinc400) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = AgrilionTokens.Emerald500,
+                        unfocusedBorderColor = AgrilionTokens.BorderSubtle
+                    )
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Box {
-                    OutlinedButton(onClick = { expandedGrano = true }, modifier = Modifier.fillMaxWidth()) {
-                        Text("${AppStateBaseDeDatos.t("Grano")}: ${AppStateBaseDeDatos.t(granoSeleccionado)}")
+                    OutlinedButton(
+                        onClick = { expandedGrano = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AgrilionTokens.BorderSubtle)
+                    ) {
+                        Text("${AppStateBaseDeDatos.t("Grano")}: ${AppStateBaseDeDatos.t(granoSeleccionado)}", color = Color.White)
                     }
                     DropdownMenu(expanded = expandedGrano, onDismissRequest = { expandedGrano = false }) {
                         granos.forEach { g ->
@@ -215,9 +268,10 @@ fun EditSiloDialog(silo: SilobolsaBaseDeDatos, onDismiss: () -> Unit, onConfirm:
                             ubicacion = ubicacionSilo
                         )) 
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = AgrilionTokens.Emerald600)
                 ) {
-                    Text(AppStateBaseDeDatos.t("Guardar"))
+                    Text(AppStateBaseDeDatos.t("Guardar"), fontWeight = FontWeight.Bold)
                 }
             }
         }

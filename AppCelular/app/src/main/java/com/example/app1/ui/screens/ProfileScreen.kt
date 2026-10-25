@@ -1,14 +1,19 @@
 package com.example.app1.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.app1.data.AppStateBaseDeDatos
+import com.example.app1.ui.theme.AgrilionTokens
 
 @Composable
 fun ProfileScreen() {
@@ -24,34 +29,65 @@ fun ProfileScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(AgrilionTokens.SurfaceDarkRoot)
             .padding(16.dp)
             .verticalScroll(scrollState)
     ) {
-        Text(AppStateBaseDeDatos.t("Mi Perfil"), style = MaterialTheme.typography.headlineMedium)
+        Text(
+            text = AppStateBaseDeDatos.t("MIS DATOS"),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Black,
+            color = Color.White,
+            letterSpacing = (-0.5).sp
+        )
         Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
             value = nombre, 
             onValueChange = { if (isEditing) nombre = it }, 
-            label = { Text(AppStateBaseDeDatos.t("Nombre")) }, 
+            label = { Text(AppStateBaseDeDatos.t("Nombre"), color = AgrilionTokens.Zinc400) }, 
             modifier = Modifier.fillMaxWidth(),
-            readOnly = !isEditing
+            readOnly = !isEditing,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedBorderColor = AgrilionTokens.Emerald500,
+                unfocusedBorderColor = AgrilionTokens.BorderSubtle,
+                focusedContainerColor = AgrilionTokens.SurfaceDark1,
+                unfocusedContainerColor = AgrilionTokens.SurfaceDark1
+            )
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         OutlinedTextField(
             value = gmail, 
             onValueChange = { if (isEditing) gmail = it }, 
-            label = { Text("Email") }, 
+            label = { Text("Email", color = AgrilionTokens.Zinc400) }, 
             modifier = Modifier.fillMaxWidth(),
-            readOnly = !isEditing
+            readOnly = !isEditing,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedBorderColor = AgrilionTokens.Emerald500,
+                unfocusedBorderColor = AgrilionTokens.BorderSubtle,
+                focusedContainerColor = AgrilionTokens.SurfaceDark1,
+                unfocusedContainerColor = AgrilionTokens.SurfaceDark1
+            )
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         OutlinedTextField(
             value = telefono, 
             onValueChange = { if (isEditing) telefono = it }, 
-            label = { Text(AppStateBaseDeDatos.t("Teléfono")) }, 
+            label = { Text(AppStateBaseDeDatos.t("Teléfono"), color = AgrilionTokens.Zinc400) }, 
             modifier = Modifier.fillMaxWidth(),
-            readOnly = !isEditing
+            readOnly = !isEditing,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedBorderColor = AgrilionTokens.Emerald500,
+                unfocusedBorderColor = AgrilionTokens.BorderSubtle,
+                focusedContainerColor = AgrilionTokens.SurfaceDark1,
+                unfocusedContainerColor = AgrilionTokens.SurfaceDark1
+            )
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -64,23 +100,31 @@ fun ProfileScreen() {
                 }
                 isEditing = !isEditing 
             }, 
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = AgrilionTokens.Emerald600)
         ) {
-            Text(if (isEditing) AppStateBaseDeDatos.t("Guardar datos") else AppStateBaseDeDatos.t("Editar datos"))
+            Text(if (isEditing) AppStateBaseDeDatos.t("Guardar datos") else AppStateBaseDeDatos.t("Editar datos"), fontWeight = FontWeight.Bold)
         }
         
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(onClick = { /* Acción */ }, modifier = Modifier.fillMaxWidth()) {
-            Text(AppStateBaseDeDatos.t("Cambiar contraseña"))
+        Spacer(modifier = Modifier.height(10.dp))
+        OutlinedButton(
+            onClick = { /* Acción */ }, 
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, AgrilionTokens.BorderSubtle)
+        ) {
+            Text(AppStateBaseDeDatos.t("Cambiar contraseña"), color = Color.White)
         }
         Spacer(modifier = Modifier.height(16.dp))
         
         Button(
             onClick = { showDeleteDialog = true },
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = AgrilionTokens.Critical)
         ) {
-            Text(AppStateBaseDeDatos.t("Eliminar mi cuenta"), color = Color.White)
+            Text(AppStateBaseDeDatos.t("Eliminar mi cuenta"), color = Color.White, fontWeight = FontWeight.Bold)
         }
 
         if (showDeleteDialog) {

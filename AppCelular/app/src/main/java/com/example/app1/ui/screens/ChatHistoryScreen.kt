@@ -1,10 +1,11 @@
 package com.example.app1.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
@@ -19,28 +20,36 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.TextStyle
 import com.example.app1.data.ChatManagerBaseDeDatos
 import com.example.app1.data.AppStateBaseDeDatos
+import com.example.app1.ui.theme.AgrilionTokens
 
 @Composable
 fun ChatHistoryScreen(onChatClick: (Int) -> Unit) {
-    // REQUERIMIENTO 1: Mostrar el historial de conversaciones guardadas automáticamente.
     val chatList = ChatManagerBaseDeDatos.chatList
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AgrilionTokens.SurfaceDarkRoot)
+            .padding(16.dp)
+    ) {
         if (chatList.isEmpty()) {
             Column(
                 modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                Spacer(modifier = Modifier.height(20.dp))
                 Text(
-                    text = AppStateBaseDeDatos.t("Empezar una conversación"),
+                    text = AppStateBaseDeDatos.t("EMPEZAR UNA CONVERSACIÓN"),
                     style = TextStyle(
-                        color = Color(0xFF00008B), 
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
+                        color = AgrilionTokens.Emerald500, 
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = (-0.5).sp
                     ),
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.clickable { onChatClick(0) }
+                    modifier = Modifier
+                        .clickable { onChatClick(0) }
+                        .padding(16.dp)
                 )
             }
         } else {
@@ -75,10 +84,11 @@ fun ChatHistoryItem(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = 6.dp)
+            .border(width = 1.dp, color = AgrilionTokens.BorderSubtle, shape = AgrilionTokens.RadiusCard)
             .clickable { onChatClick() },
-        color = Color(0xFFF5F5F5),
-        shape = RoundedCornerShape(8.dp)
+        color = AgrilionTokens.SurfaceDark1,
+        shape = AgrilionTokens.RadiusCard
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -89,19 +99,20 @@ fun ChatHistoryItem(
                 Text(
                     text = chat.name, 
                     style = MaterialTheme.typography.bodyLarge, 
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = chat.date, 
                     style = MaterialTheme.typography.bodySmall, 
-                    color = Color.Gray
+                    color = AgrilionTokens.Zinc400
                 )
             }
             
-            // REQUERIMIENTO 1: 3 puntitos para eliminar y cambiar nombre
             Box {
                 IconButton(onClick = { showMenu = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Opciones")
+                    Icon(Icons.Default.MoreVert, contentDescription = "Opciones", tint = AgrilionTokens.Zinc400)
                 }
                 
                 DropdownMenu(
@@ -116,7 +127,7 @@ fun ChatHistoryItem(
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text(AppStateBaseDeDatos.t("Eliminar"), color = Color.Red) },
+                        text = { Text(AppStateBaseDeDatos.t("Eliminar"), color = AgrilionTokens.Critical) },
                         onClick = { 
                             showMenu = false
                             onDelete() 

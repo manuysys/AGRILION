@@ -1,5 +1,7 @@
 package com.example.app1.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -8,19 +10,19 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.app1.data.AppStateBaseDeDatos
+import com.example.app1.ui.theme.AgrilionTokens
 
 @Composable
 fun SettingsScreen() {
     val scrollState = rememberScrollState()
     
-    // Idiomas disponibles
     val languages = listOf("Español", "English", "Português")
     var showLanguageMenu by remember { mutableStateOf(false) }
 
@@ -32,26 +34,29 @@ fun SettingsScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(AgrilionTokens.SurfaceDarkRoot)
             .padding(16.dp)
             .verticalScroll(scrollState)
     ) {
         
-        // IDIOMA TRADUCIDO
+        // IDIOMA
         Text(
-            text = AppStateBaseDeDatos.t("Idioma"), 
-            style = TextStyle(fontSize = 23.sp, fontWeight = FontWeight.Bold)
+            text = AppStateBaseDeDatos.t("IDIOMA"), 
+            style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White, letterSpacing = (-0.5).sp)
         )
         Box(modifier = Modifier.padding(vertical = 8.dp)) {
             OutlinedButton(
                 onClick = { showLanguageMenu = true },
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth(0.7f),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+                border = androidx.compose.foundation.BorderStroke(1.dp, AgrilionTokens.BorderSubtle),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
             ) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = AppStateBaseDeDatos.currentLanguage,
-                        style = MaterialTheme.typography.bodyLarge
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White
                     )
                 }
             }
@@ -63,7 +68,6 @@ fun SettingsScreen() {
                     DropdownMenuItem(
                         text = { Text(lang) },
                         onClick = {
-                            // 2. ACTUALIZACIÓN DE IDIOMA GLOBAL
                             AppStateBaseDeDatos.currentLanguage = lang
                             showLanguageMenu = false
                         }
@@ -74,12 +78,12 @@ fun SettingsScreen() {
         
         Spacer(modifier = Modifier.height(24.dp))
 
-        // UNIDADES TRADUCIDAS
+        // UNIDADES DE MEDIDA
         Text(
-            text = AppStateBaseDeDatos.t("Unidades de Medida"), 
-            style = TextStyle(fontSize = 23.sp, fontWeight = FontWeight.Bold)
+            text = AppStateBaseDeDatos.t("UNIDADES DE MEDIDA"), 
+            style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White, letterSpacing = (-0.5).sp)
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         UnitSelectorRow(AppStateBaseDeDatos.t("Temperatura"), tempUnit, listOf("Celsius (°C)", "Fahrenheit (°F)")) { tempUnit = it }
         UnitSelectorRow("CO2", co2Unit, listOf("PPM", "Porcentaje (%)")) { co2Unit = it }
@@ -90,10 +94,11 @@ fun SettingsScreen() {
         UnitSelectorRow(AppStateBaseDeDatos.t("Humedad"), humUnit, listOf("Porcentaje (%)", "Gramos/m3")) { humUnit = it }
 
         Spacer(modifier = Modifier.height(24.dp))
-        
+
+        // NOTIFICACIONES
         Text(
-            text = AppStateBaseDeDatos.t("Notificaciones"), 
-            style = TextStyle(fontSize = 23.sp, fontWeight = FontWeight.Bold)
+            text = AppStateBaseDeDatos.t("NOTIFICACIONES"), 
+            style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White, letterSpacing = (-0.5).sp)
         )
         Spacer(modifier = Modifier.height(12.dp))
         
@@ -113,7 +118,72 @@ fun SettingsScreen() {
             opt3 = AppStateBaseDeDatos.t("Informativos")
         )
 
+        Spacer(modifier = Modifier.height(28.dp))
+
+        // INFORMACIÓN DEL SISTEMA (Regla D2: Franja de Créditos del Autor al pie del Card)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(width = 1.dp, color = AgrilionTokens.BorderSubtle, shape = AgrilionTokens.RadiusCard),
+            shape = AgrilionTokens.RadiusCard,
+            colors = CardDefaults.cardColors(containerColor = AgrilionTokens.SurfaceDark1)
+        ) {
+            Column {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(
+                        text = AppStateBaseDeDatos.t("INFORMACIÓN DEL SISTEMA"),
+                        style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White, letterSpacing = (-0.5).sp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    SystemInfoRow("Plataforma", "Agrilion+ Operational Native")
+                    SystemInfoRow("Versión App", "1.0.0 (Production)")
+                    SystemInfoRow("Estado Módulo", "Conectado LoRaWAN / InfluxDB")
+                }
+
+                // FRANJA DISCRETA AL PIE DEL CARD (Regla del AUTOR D2)
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)),
+                    color = AgrilionTokens.Zinc800Translucent
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = AppStateBaseDeDatos.t("AUTOR"),
+                            style = AgrilionTokens.LabelSmallMuted
+                        )
+                        Text(
+                            text = "Juan Manuel Iglesias",
+                            style = TextStyle(
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = AgrilionTokens.Zinc400
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+fun SystemInfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = AgrilionTokens.Zinc400)
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White)
     }
 }
 
@@ -124,13 +194,15 @@ fun NotificationBox(title: String, opt1: String, opt2: String, opt3: String) {
     var check3 by remember { mutableStateOf(false) }
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color(0xFFF0F0F0),
-        shape = RoundedCornerShape(8.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(width = 1.dp, color = AgrilionTokens.BorderSubtle, shape = AgrilionTokens.RadiusCard),
+        color = AgrilionTokens.SurfaceDark1,
+        shape = AgrilionTokens.RadiusCard
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-            HorizontalDivider(color = Color.Gray, thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge, color = Color.White)
+            HorizontalDivider(color = AgrilionTokens.BorderSubtle, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             NotificationOptionRowSimplificada(opt1, check1) { check1 = it }
             NotificationOptionRowSimplificada(opt2, check2) { check2 = it }
             NotificationOptionRowSimplificada(opt3, check3) { check3 = it }
@@ -145,25 +217,34 @@ fun NotificationOptionRowSimplificada(text: String, isChecked: Boolean, onChecke
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-        Checkbox(checked = isChecked, onCheckedChange = onCheckedChange)
+        Text(text, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = AgrilionTokens.Zinc400)
+        Checkbox(
+            checked = isChecked,
+            onCheckedChange = onCheckedChange,
+            colors = CheckboxDefaults.colors(
+                checkedColor = AgrilionTokens.Emerald600,
+                uncheckedColor = AgrilionTokens.Zinc500
+            )
+        )
     }
 }
 
 @Composable
 fun UnitSelectorRow(label: String, selected: String, options: List<String>, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Text(label, style = MaterialTheme.typography.labelMedium)
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = AgrilionTokens.Zinc400)
+        Spacer(modifier = Modifier.height(4.dp))
         Box {
             OutlinedButton(
                 onClick = { expanded = true },
                 shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth(0.7f), 
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                modifier = Modifier.fillMaxWidth(),
+                border = androidx.compose.foundation.BorderStroke(1.dp, AgrilionTokens.BorderSubtle),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
             ) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
-                    Text(selected, style = MaterialTheme.typography.bodyMedium)
+                    Text(selected, style = MaterialTheme.typography.bodyMedium, color = Color.White)
                 }
             }
             DropdownMenu(

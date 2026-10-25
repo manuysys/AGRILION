@@ -1,8 +1,9 @@
 package com.example.app1.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -11,8 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.app1.data.AppStateBaseDeDatos
 import com.example.app1.data.SilosDataManagerBaseDeDatos
+import com.example.app1.ui.theme.AgrilionTokens
 
 @Composable
 fun RecommendationsScreen() {
@@ -22,15 +25,15 @@ fun RecommendationsScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(AgrilionTokens.SurfaceDarkRoot)
             .padding(16.dp)
             .verticalScroll(scrollState)
     ) {
-        // REQUERIMIENTO 2: Si no hay granos para analizar, no mostrar nada (o mensaje vacío)
         if (silos.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize().padding(top = 100.dp), contentAlignment = Alignment.Center) {
                 Text(
                     text = "No hay granos registrados para analizar",
-                    color = Color.Gray,
+                    color = AgrilionTokens.Zinc400,
                     style = MaterialTheme.typography.bodyLarge
                 )
             }
@@ -38,7 +41,6 @@ fun RecommendationsScreen() {
             val tiposDeGrano = listOf("Trigo", "Maíz", "Soja", "Cebada", "Girasol")
             
             tiposDeGrano.forEach { grano ->
-                // Solo mostrar la tarjeta si existe al menos un silo de ese tipo
                 if (silos.any { it.tipoGrano.equals(grano, ignoreCase = true) }) {
                     RecommendationCard(
                         grain = AppStateBaseDeDatos.t(grano),
@@ -56,30 +58,32 @@ fun RecommendationsScreen() {
 @Composable
 fun RecommendationCard(grain: String, recommendation: String) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color(0xFFF9F9F9),
-        shape = RoundedCornerShape(12.dp),
-        shadowElevation = 2.dp
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(width = 1.dp, color = AgrilionTokens.BorderSubtle, shape = AgrilionTokens.RadiusCard),
+        color = AgrilionTokens.SurfaceDark1,
+        shape = AgrilionTokens.RadiusCard
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
             Text(
-                text = "${AppStateBaseDeDatos.t("Grano")}: $grain",
+                text = "${AppStateBaseDeDatos.t("GRANO")}: ${grain.uppercase()}",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                fontWeight = FontWeight.Black,
+                color = AgrilionTokens.Emerald500,
+                letterSpacing = (-0.5).sp
             )
             
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.LightGray.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = AgrilionTokens.BorderSubtle)
             
             Text(
-                text = "${AppStateBaseDeDatos.t("Recomendaciones")}:",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold
+                text = "${AppStateBaseDeDatos.t("RECOMENDACIONES")}:",
+                style = AgrilionTokens.LabelSmallMuted
             )
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = recommendation,
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 4.dp)
+                color = Color.White
             )
         }
     }

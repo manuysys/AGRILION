@@ -1,6 +1,7 @@
 package com.example.app1.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,14 +18,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.app1.data.AppStateBaseDeDatos
-import com.example.app1.data.EstadoSilo
 import com.example.app1.data.SilosDataManagerBaseDeDatos
+import com.example.app1.data.SilobolsaBaseDeDatos
+import com.example.app1.ui.theme.AgrilionTokens
 
 @Composable
 fun DiagnosisScreen() {
     var searchQuery by remember { mutableStateOf("") }
     
-    // Lista vinculada al Backend/IA
     val silosList = SilosDataManagerBaseDeDatos.silosList
     val filteredSilos = if (searchQuery.isBlank()) {
         silosList
@@ -32,17 +33,28 @@ fun DiagnosisScreen() {
         silosList.filter { it.nombre.contains(searchQuery, ignoreCase = true) || it.id.contains(searchQuery) }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        
-        // REQUERIMIENTO 4: Barra de búsqueda centrada arriba (sin segundo título)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AgrilionTokens.SurfaceDarkRoot)
+            .padding(16.dp)
+    ) {
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-            placeholder = { Text(AppStateBaseDeDatos.t("Busca tu silobolsa")) },
-            trailingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            placeholder = { Text(AppStateBaseDeDatos.t("Busca tu silobolsa"), color = AgrilionTokens.Zinc400) },
+            trailingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AgrilionTokens.Zinc400) },
             shape = RoundedCornerShape(24.dp),
-            singleLine = true
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedBorderColor = AgrilionTokens.Emerald500,
+                unfocusedBorderColor = AgrilionTokens.BorderSubtle,
+                focusedContainerColor = AgrilionTokens.SurfaceDark1,
+                unfocusedContainerColor = AgrilionTokens.SurfaceDark1
+            )
         )
 
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
@@ -54,13 +66,16 @@ fun DiagnosisScreen() {
 }
 
 @Composable
-fun DiagnosisItem(silo: com.example.app1.data.SilobolsaBaseDeDatos) {
+fun DiagnosisItem(silo: SilobolsaBaseDeDatos) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF9F9F9))
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .border(width = 1.dp, color = AgrilionTokens.BorderSubtle, shape = AgrilionTokens.RadiusCard),
+        shape = AgrilionTokens.RadiusCard,
+        colors = CardDefaults.cardColors(containerColor = AgrilionTokens.SurfaceDark1)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -69,10 +84,10 @@ fun DiagnosisItem(silo: com.example.app1.data.SilobolsaBaseDeDatos) {
                 Text(
                     text = silo.nombre,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
                 
-                // Indicador visual de estado
                 Box(
                     modifier = Modifier
                         .size(12.dp)
@@ -83,24 +98,23 @@ fun DiagnosisItem(silo: com.example.app1.data.SilobolsaBaseDeDatos) {
             Text(
                 text = "${AppStateBaseDeDatos.t("Grano")}: ${AppStateBaseDeDatos.t(silo.tipoGrano)}",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray
+                color = AgrilionTokens.Zinc400
             )
             
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.LightGray.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = AgrilionTokens.BorderSubtle)
             
             Text(
-                text = AppStateBaseDeDatos.t("Diagnóstico"),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = if (silo.tendenciaCritica) Color.Red else MaterialTheme.colorScheme.primary
+                text = AppStateBaseDeDatos.t("DIAGNÓSTICO PREDICTIVO IA"),
+                style = AgrilionTokens.LabelSmallMuted,
+                color = if (silo.tendenciaCritica) AgrilionTokens.Critical else AgrilionTokens.Emerald500
             )
             
             Spacer(modifier = Modifier.height(4.dp))
             
-            // REQUERIMIENTO 4: Diagnóstico generado por la IA
             Text(
                 text = silo.diagnosticoSemanal,
                 style = MaterialTheme.typography.bodyMedium,
+                color = Color.White,
                 lineHeight = 20.sp
             )
         }
