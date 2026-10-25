@@ -29,7 +29,7 @@ bool keepNet              = true;
 // Cambiamos el penúltimo valor de 0x0002 a 0x0000. 
 // Esto apaga los canales de 500kHz y fuerza a la placa a unirse en DR2 o DR3.
 uint16_t userChannelsMask[6] = { 0xFF00, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000 };
-uint32_t appTxDutyCycle = 20000;
+uint32_t appTxDutyCycle = 16000;  // + ~4 s de lectura = ~20 s entre transmisiones
 
 // ================== Sensores ==================
 Adafruit_BME280 bme;
@@ -37,6 +37,7 @@ Adafruit_SHT31  sht30 = Adafruit_SHT31();
 SCD4x           scd41(SCD4x_SENSOR_SCD41);
 Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
 bool scd41_initialized = false;
+uint16_t last_co2 = 0;
 
 #define PIN_INTERRUPCION GPIO5
 
@@ -44,11 +45,9 @@ bool scd41_initialized = false;
 // Se habilita para enviar CO2 real en el payload.
 #define AGRILION_CO2 1
 
-// Tiempo de estabilización del SCD41 antes de medir. El datasheet recomienda
-// 3 minutos tras un power-up para alcanzar la precisión especificada.
-// Con 30 s las lecturas quedaban altas/inestables; se usa el valor del
-// datasheet. El costo es un ciclo de transmisión más largo.
-#define AGRILION_CO2_WARMUP_MS 180000
+// El SCD41 queda encendido de forma continua y en modo periódico.
+// Solo se espera un poco para estabilizar SHT30/BME280 en el primer ciclo.
+#define AGRILION_CO2_WARMUP_MS 2000
 
 volatile bool flag_interrupcion  = false;
 bool     impactoPendiente        = false;
@@ -198,49 +197,36 @@ void prepareTxFrame(uint8_t port)
   // ================== CO2 (SCD41) ==================
   // Modo single-shot: hay que esperar ~5s a que el dato esté listo.
   // La librería devuelve TRUE cuando hay medición fresca (ver Example8).
-  uint16_t co2 = 0;
+  uint16_t co2 = last_co2;
 #if AGRILION_CO2
-  // Inicialización diferida: se hace después del join, no en setup.
+  // Inicialización diferida después del join. El sensor queda encendido
+  // y en modo periódico (mide cada 5 s), sin single-shot ni warm-up largo.
   if (!scd41_initialized) {
-    if (scd41.begin(Wire, false)) {
-      scd41.setAutomaticSelfCalibrationEnabled(false);
+    if (scd41.begin(Wire, true, false)) {  // measBegin=true, ASC=false
       scd41_initialized = true;
+      delay(5000);                         // primera medición
+      scd41.readMeasurement();
+      last_co2 = scd41.getCO2();
+      co2 = last_co2;
     } else {
       Serial.println("WARNING: SCD41 no detectado en prepareTxFrame.");
     }
-  }
-
-  bool medicionLista = false;
-
-  // Compensación de presión (BME280 en hPa -> librería en Pa)
-  if (!isnan(pres) && pres > 0) {
-    scd41.setAmbientPressure(pres * 100.0F);
-  }
-
-  if (scd41.measureSingleShot()) {
-    for (int i = 0; i < 13; i++) {
-      delay(500);
-      if (scd41.readMeasurement()) {
-        co2 = scd41.getCO2();
-        medicionLista = true;
-        break;
-      }
-    }
   } else {
-    Serial.println("WARNING: SCD41 no aceptó measureSingleShot");
-  }
-
-  if (!medicionLista) {
-    Serial.println("WARNING: SCD41 sin datos en 6.5s");
+    // Compensación de presión (BME280 en hPa -> librería en Pa)
+    if (!isnan(pres) && pres > 0) {
+      scd41.setAmbientPressure(pres * 100.0F);
+    }
+    if (scd41.readMeasurement()) {
+      uint16_t c = scd41.getCO2();
+      if (c > 0 && c <= 5000) last_co2 = c;
+    }
+    co2 = last_co2;
   }
 #endif
 
-  // Apagar los sensores ANTES de transmitir (radio limpia) y descargar el
-  // bus I2C para evitar que queden alimentados fantasma por SDA/SCL.
-  digitalWrite(Vext, HIGH);
-  Wire.end();
-  pinMode(SDA, OUTPUT); digitalWrite(SDA, LOW);
-  pinMode(SCL, OUTPUT); digitalWrite(SCL, LOW);
+  // Vext y el SCD41 quedan encendidos de forma continua. Se deja un pequeño
+  // margen antes de transmitir; si la radio falla por consumo, habrá que
+  // volver al apagado entre lecturas.
   delay(20);
 
   int16_t t = isnan(temp) ? 0 : (int16_t)(temp * 100);
