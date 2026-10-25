@@ -43,13 +43,14 @@ interface ChatApiServiceBaseDeDatos {
             // El LLM local puede tardar bastante en el primer token; el timeout
             // por defecto de OkHttp (10 s) corta la respuesta.
             val client = OkHttpClient.Builder()
+                .addInterceptor(ApiConfig.dynamicBaseUrlInterceptor())
                 .connectTimeout(20, TimeUnit.SECONDS)
                 .readTimeout(120, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .build()
 
             return Retrofit.Builder()
-                .baseUrl(ApiConfig.BASE_URL)
+                .baseUrl(ApiConfig.DEFAULT_BASE_URL)
                 .client(client)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()

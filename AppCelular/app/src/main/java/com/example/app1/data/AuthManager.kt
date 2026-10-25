@@ -305,11 +305,17 @@ class AuthManager {
 
     // ─── PROFILE ───────────────────────────────────────────────────────────
 
-    /** Actualiza el nombre visible del perfil. */
-    suspend fun updateUserProfile(name: String) {
+    /** Actualiza los datos editables del perfil. */
+    suspend fun updateUserProfile(name: String, phone: String? = null) {
         val uid = currentUser?.uid ?: throw IllegalStateException("No hay usuario logueado")
         val updates = hashMapOf<String, Any>("name" to name)
+        if (phone != null) updates["phone"] = phone
         db.collection("users").document(uid).update(updates).await()
+    }
+
+    /** Envía el email de restablecimiento de contraseña de Firebase. */
+    suspend fun sendPasswordReset(email: String) {
+        auth.sendPasswordResetEmail(email.trim()).await()
     }
 
     /**

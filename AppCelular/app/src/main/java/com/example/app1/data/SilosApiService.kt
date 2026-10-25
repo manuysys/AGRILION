@@ -80,13 +80,14 @@ interface SilosApiService {
     companion object {
         fun create(): SilosApiService {
             val client = OkHttpClient.Builder()
+                .addInterceptor(ApiConfig.dynamicBaseUrlInterceptor())
                 .connectTimeout(20, TimeUnit.SECONDS)
                 .readTimeout(90, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .build()
 
             return Retrofit.Builder()
-                .baseUrl(ApiConfig.BASE_URL)
+                .baseUrl(ApiConfig.DEFAULT_BASE_URL)
                 .client(client)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()

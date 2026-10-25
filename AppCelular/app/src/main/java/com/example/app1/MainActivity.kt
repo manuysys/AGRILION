@@ -29,16 +29,21 @@ import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.app1.ui.theme.AgrilionTokens
 import com.example.app1.ui.screens.*
+import com.example.app1.data.ApiConfig
 import com.example.app1.data.AppStateBaseDeDatos
 import com.example.app1.data.AuthManager
 import com.example.app1.data.SilosDataManagerBaseDeDatos
 import com.example.app1.data.SilobolsaBaseDeDatos
 import com.example.app1.data.EstadoSilo
+import com.example.app1.data.UserPreferences
 import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -47,6 +52,8 @@ import kotlin.math.roundToInt
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ApiConfig.init(this)
+        UserPreferences.init(this)
         setContent {
             AgrilionTheme {
                 Surface(
@@ -87,6 +94,7 @@ fun AgrilionApp(user: FirebaseUser? = null) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     LaunchedEffect(user?.uid) {
         if (user == null) {
@@ -111,9 +119,12 @@ fun AgrilionApp(user: FirebaseUser? = null) {
         }
 
         // Refresco periódico de los silos desde la AI API.
-        while (true) {
-            SilosDataManagerBaseDeDatos.refresh()
-            delay(20_000)
+        // Se pausa cuando la app deja de estar visible.
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                SilosDataManagerBaseDeDatos.refresh()
+                delay(20_000)
+            }
         }
     }
 

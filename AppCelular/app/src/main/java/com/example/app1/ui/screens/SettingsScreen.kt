@@ -12,16 +12,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.app1.data.ApiConfig
 import com.example.app1.data.AppStateBaseDeDatos
+import com.example.app1.data.ChatApiServiceBaseDeDatos
+import com.example.app1.data.SilosDataManagerBaseDeDatos
+import com.example.app1.data.UserPreferences
 import com.example.app1.ui.theme.AgrilionTokens
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen() {
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var apiUrl by remember { mutableStateOf(ApiConfig.baseUrl) }
+    var apiMessage by remember { mutableStateOf<String?>(null) }
+    var apiTesting by remember { mutableStateOf(false) }
     
     val languages = listOf("Español", "English", "Português")
     var showLanguageMenu by remember { mutableStateOf(false) }
@@ -38,7 +50,104 @@ fun SettingsScreen() {
             .padding(16.dp)
             .verticalScroll(scrollState)
     ) {
-        
+        // CONEXIÓN API
+        Text(
+            text = "CONEXIÓN API",
+            style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White, letterSpacing = (-0.5).sp)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+            value = apiUrl,
+            onValueChange = { apiUrl = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("URL de la API", color = AgrilionTokens.Zinc400) },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedBorderColor = AgrilionTokens.Emerald500,
+                unfocusedBorderColor = AgrilionTokens.BorderSubtle,
+                focusedContainerColor = AgrilionTokens.SurfaceDark1,
+                unfocusedContainerColor = AgrilionTokens.SurfaceDark1
+            )
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = {
+                    val error = ApiConfig.save(context, apiUrl)
+                    if (error == null) {
+                        apiUrl = ApiConfig.baseUrl
+                        apiMessage = "URL guardada. Probá la conexión."
+                    } else {
+                        apiMessage = error
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = AgrilionTokens.Emerald600)
+            ) {
+                Text("Guardar")
+            }
+            OutlinedButton(
+                onClick = {
+                    ApiConfig.reset(context)
+                    apiUrl = ApiConfig.baseUrl
+                    apiMessage = "URL restablecida al valor por defecto."
+                },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, AgrilionTokens.BorderSubtle)
+            ) {
+                Text("Restablecer", color = Color.White)
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(
+            onClick = {
+                scope.launch {
+                    apiTesting = true
+                    apiMessage = "Probando conexión..."
+                    try {
+                        val health = ChatApiServiceBaseDeDatos.create().checkHealth()
+                        apiMessage = "Conexión OK (${health.status})"
+                        SilosDataManagerBaseDeDatos.refresh()
+                    } catch (e: Exception) {
+                        apiMessage = "Sin conexión: ${e.message ?: e.javaClass.simpleName}"
+                    } finally {
+                        apiTesting = false
+                    }
+                }
+            },
+            enabled = !apiTesting,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = AgrilionTokens.SurfaceDark2)
+        ) {
+            Text(if (apiTesting) "Probando..." else "Probar conexión", color = Color.White)
+        }
+        if (apiMessage != null) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = apiMessage!!,
+                color = when {
+                    apiMessage!!.startsWith("Conexión OK") -> AgrilionTokens.Emerald500
+                    apiMessage!!.startsWith("Sin conexión") || apiMessage!!.contains("inválida") -> AgrilionTokens.Critical
+                    else -> AgrilionTokens.Zinc400
+                },
+                fontSize = 12.sp
+            )
+        }
+        Text(
+            text = "Emulador: http://10.0.2.2:8000/ · Celular: IP de la PC",
+            color = AgrilionTokens.Zinc500,
+            fontSize = 11.sp,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         // IDIOMA
         Text(
             text = AppStateBaseDeDatos.t("IDIOMA"), 
@@ -69,6 +178,7 @@ fun SettingsScreen() {
                         text = { Text(lang) },
                         onClick = {
                             AppStateBaseDeDatos.currentLanguage = lang
+                            UserPreferences.saveLanguage(context, lang)
                             showLanguageMenu = false
                         }
                     )
@@ -88,7 +198,8 @@ fun SettingsScreen() {
         UnitSelectorRow(AppStateBaseDeDatos.t("Temperatura"), tempUnit, listOf("Celsius (°C)", "Fahrenheit (°F)")) { tempUnit = it }
         UnitSelectorRow("CO2", co2Unit, listOf("PPM", "Porcentaje (%)")) { co2Unit = it }
         UnitSelectorRow(AppStateBaseDeDatos.t("Peso"), AppStateBaseDeDatos.unidadPesoSeleccionada, listOf("Toneladas (TN)", "Kilogramos (Kg)")) { 
-            AppStateBaseDeDatos.unidadPesoSeleccionada = it 
+            AppStateBaseDeDatos.unidadPesoSeleccionada = it
+            UserPreferences.saveWeightUnit(context, it)
         }
         UnitSelectorRow(AppStateBaseDeDatos.t("Presión"), pressUnit, listOf("Hectopascales (hPa)", "Bar")) { pressUnit = it }
         UnitSelectorRow(AppStateBaseDeDatos.t("Humedad"), humUnit, listOf("Porcentaje (%)", "Gramos/m3")) { humUnit = it }

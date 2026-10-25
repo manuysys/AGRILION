@@ -27,6 +27,8 @@ fun DiagnosisScreen() {
     var searchQuery by remember { mutableStateOf("") }
     
     val silosList = SilosDataManagerBaseDeDatos.silosList
+    val isLoading = SilosDataManagerBaseDeDatos.isLoading
+    val error = SilosDataManagerBaseDeDatos.error
     val filteredSilos = if (searchQuery.isBlank()) {
         silosList
     } else {
@@ -57,9 +59,27 @@ fun DiagnosisScreen() {
             )
         )
 
-        LazyColumn(modifier = Modifier.fillMaxWidth()) {
-            items(filteredSilos) { silo ->
-                DiagnosisItem(silo)
+        if (silosList.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(bottom = 100.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (isLoading) {
+                        CircularProgressIndicator(color = AgrilionTokens.Emerald500)
+                        Spacer(Modifier.height(12.dp))
+                    }
+                    Text(
+                        text = error ?: "No hay silos registrados para diagnosticar",
+                        color = if (error != null) AgrilionTokens.Critical else AgrilionTokens.Zinc400
+                    )
+                }
+            }
+        } else {
+            LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                items(filteredSilos) { silo ->
+                    DiagnosisItem(silo)
+                }
             }
         }
     }

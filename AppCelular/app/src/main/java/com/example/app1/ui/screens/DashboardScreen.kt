@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.*
@@ -165,20 +166,43 @@ fun DashboardScreen() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // UBICACIÓN
-        DashboardSection(AppStateBaseDeDatos.t("UBICACIÓN")) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp)
-                    .background(AgrilionTokens.SurfaceDark2, AgrilionTokens.RadiusCard)
-                    .border(1.dp, AgrilionTokens.BorderSubtle, AgrilionTokens.RadiusCard),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(40.dp), tint = AgrilionTokens.Zinc400)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(AppStateBaseDeDatos.t("Simulación de Mapa"), color = AgrilionTokens.Zinc400, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        // UBICACIONES REALES
+        DashboardSection("UBICACIONES") {
+            val ubicados = silos.filter {
+                it.ubicacion.isNotBlank() && !it.ubicacion.equals("Sin ubicación", ignoreCase = true)
+            }
+            if (ubicados.isEmpty()) {
+                Text(
+                    "Todavía no hay ubicaciones cargadas. Podés agregarlas desde Mis Silos.",
+                    color = AgrilionTokens.Zinc400,
+                    fontSize = 13.sp
+                )
+            } else {
+                ubicados.forEachIndexed { index, silo ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Map,
+                            contentDescription = null,
+                            tint = AgrilionTokens.Emerald500,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(silo.nombre, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text(silo.ubicacion, color = AgrilionTokens.Zinc400, fontSize = 12.sp)
+                        }
+                        Text(
+                            "${silo.temperatura.toInt()} °C · ${silo.humedad.toInt()}%",
+                            color = AgrilionTokens.Zinc500,
+                            fontSize = 11.sp
+                        )
+                    }
+                    if (index < ubicados.lastIndex) {
+                        HorizontalDivider(color = AgrilionTokens.BorderSubtle)
+                    }
                 }
             }
         }
@@ -208,6 +232,12 @@ fun DashboardScreen() {
             }
             Spacer(modifier = Modifier.height(12.dp))
             LegacyPricingTable()
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "Valores de referencia al 10/07/2026. No es una cotización en vivo.",
+                color = AgrilionTokens.Zinc500,
+                fontSize = 10.sp
+            )
         }
 
         Spacer(modifier = Modifier.height(32.dp))
