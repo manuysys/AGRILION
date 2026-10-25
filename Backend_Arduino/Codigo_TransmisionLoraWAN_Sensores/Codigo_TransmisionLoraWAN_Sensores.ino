@@ -180,6 +180,21 @@ void prepareTxFrame(uint8_t port)
   }
   Serial.printf("[BME280] p=%.2f\n", pres);
 
+  // Leer el acelerómetro ANTES del SCD41: la medición de CO2 ocupa el bus
+  // I2C durante varios segundos y puede corromper la lectura del ADXL345.
+  if (!impactoPendiente) {
+    float inst = leerAcelerometroInstantaneo();
+    if (inst >= 0 && inst <= 160) {   // 16 g máximo del ADXL345
+      aceleracionGuardada = (uint16_t)(inst * 10);
+    } else {
+      aceleracionGuardada = 0;
+    }
+  } else if (aceleracionGuardada > 1600) {
+    // Impacto inválido (>16 g): descartarlo y no reportarlo.
+    impactoPendiente = false;
+    aceleracionGuardada = 0;
+  }
+
   // ================== CO2 (SCD41) ==================
   // Modo single-shot: hay que esperar ~5s a que el dato esté listo.
   // La librería devuelve TRUE cuando hay medición fresca (ver Example8).
@@ -219,11 +234,6 @@ void prepareTxFrame(uint8_t port)
     Serial.println("WARNING: SCD41 sin datos en 6.5s");
   }
 #endif
-
-  if (!impactoPendiente) {
-    float inst = leerAcelerometroInstantaneo();
-    aceleracionGuardada = (uint16_t)(inst * 10);
-  }
 
   // Apagar los sensores ANTES de transmitir (radio limpia) y descargar el
   // bus I2C para evitar que queden alimentados fantasma por SDA/SCL.
@@ -337,7 +347,7 @@ void loop()
 
     // Debounce: solo impactos reales (>1.5 m/s²) y máximo uno cada 30s
     // (el ADXL con Vext siempre encendido puede disparar en ráfaga).
-    if (valorImpacto > 1.5 && (millis() - ultimoImpacto > 30000)) {
+    if (valorImpacto > 1.5 && valorImpacto <= 160 && (millis() - ultimoImpacto > 30000)) {
       aceleracionGuardada = (uint16_t)(valorImpacto * 10);
       impactoPendiente    = true;
       ultimoImpacto       = millis();
