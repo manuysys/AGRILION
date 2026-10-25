@@ -13,11 +13,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.app1.data.AppStateBaseDeDatos
+import com.example.app1.data.AuthManager
+import com.example.app1.data.SilosDataManagerBaseDeDatos
 import com.example.app1.ui.theme.AgrilionTokens
+import kotlinx.coroutines.launch
 
 @Composable
 fun ProfileScreen() {
     val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
     var showDeleteDialog by remember { mutableStateOf(false) }
     
     var isEditing by remember { mutableStateOf(false) }
@@ -25,6 +29,17 @@ fun ProfileScreen() {
     var nombre by remember { mutableStateOf(AppStateBaseDeDatos.userName) }
     var gmail by remember { mutableStateOf(AppStateBaseDeDatos.userEmail) }
     var telefono by remember { mutableStateOf("+54 9 11 ...") }
+
+    LaunchedEffect(AppStateBaseDeDatos.userName, isEditing) {
+        if (!isEditing && AppStateBaseDeDatos.userName.isNotBlank()) {
+            nombre = AppStateBaseDeDatos.userName
+        }
+    }
+    LaunchedEffect(AppStateBaseDeDatos.userEmail, isEditing) {
+        if (!isEditing && AppStateBaseDeDatos.userEmail.isNotBlank()) {
+            gmail = AppStateBaseDeDatos.userEmail
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -97,6 +112,13 @@ fun ProfileScreen() {
                 if (isEditing) {
                     AppStateBaseDeDatos.userName = nombre
                     AppStateBaseDeDatos.userEmail = gmail
+                    scope.launch {
+                        try {
+                            AuthManager.getInstance().updateUserProfile(nombre)
+                        } catch (_: Exception) {
+                            // El dato local se conserva aunque falle Firestore.
+                        }
+                    }
                 }
                 isEditing = !isEditing 
             }, 
@@ -115,6 +137,18 @@ fun ProfileScreen() {
             border = androidx.compose.foundation.BorderStroke(1.dp, AgrilionTokens.BorderSubtle)
         ) {
             Text(AppStateBaseDeDatos.t("Cambiar contraseña"), color = Color.White)
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        OutlinedButton(
+            onClick = {
+                SilosDataManagerBaseDeDatos.clear()
+                AuthManager.getInstance().signOut()
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, AgrilionTokens.BorderSubtle)
+        ) {
+            Text("Cerrar sesión", color = Color.White)
         }
         Spacer(modifier = Modifier.height(16.dp))
         

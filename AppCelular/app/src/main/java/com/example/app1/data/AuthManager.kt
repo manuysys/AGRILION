@@ -5,10 +5,12 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
 /**
  * AGRILION — AuthManager
@@ -94,23 +96,32 @@ class AuthManager {
         val result = auth.createUserWithEmailAndPassword(email, password).await()
         val user = result.user ?: throw IllegalStateException("Usuario nulo tras registro")
 
-        // Enviar email de verificación (opcional)
-        try {
-            user.sendEmailVerification().await()
-        } catch (e: Exception) {
-            Log.w(TAG, "No se pudo enviar email de verificación: ${e.message}")
-        }
+        // El gate de autenticación cambia a la app apenas Firebase crea el
+        // usuario. NonCancellable evita que se cancele la creación del perfil
+        // cuando LoginScreen sale de composición.
+        withContext(NonCancellable) {
+            try {
+                user.sendEmailVerification().await()
+            } catch (e: Exception) {
+                Log.w(TAG, "No se pudo enviar email de verificación: ${e.message}")
+            }
 
-        // Crear perfil en Firestore
-        val profile = hashMapOf(
-            "email" to email,
-            "name" to name,
-            "phone" to phone,
-            "company" to company,
-            "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
-            "role" to "user",
-        )
-        db.collection("users").document(user.uid).set(profile).await()
+            val profile = hashMapOf(
+                "email" to email,
+                "name" to name,
+                "phone" to phone,
+                "company" to company,
+                "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
+                "role" to "user",
+            )
+            try {
+                db.collection("users").document(user.uid).set(profile).await()
+                Log.d(TAG, "Perfil creado: ${user.uid}")
+            } catch (e: Exception) {
+                Log.e(TAG, "No se pudo crear el perfil: ${e.message}", e)
+                throw e
+            }
+        }
 
         Log.d(TAG, "Registro exitoso: ${user.uid}")
         return user
@@ -187,6 +198,72 @@ class AuthManager {
         return docRef.id
     }
 
+    /** Actualiza los datos editables de un silo del usuario actual. */
+    suspend fun updateSilo(
+        siloId: String,
+        name: String,
+        grainType: String,
+        location: String,
+        tons: Double,
+    ) {
+        val uid = currentUser?.uid ?: throw IllegalStateException("No hay usuario logueado")
+        val updates = hashMapOf<String, Any>(
+            "name" to name,
+            "grainType" to grainType,
+            "location" to location,
+            "tons" to tons,
+        )
+        db.collection("users")
+            .document(uid)
+            .collection("silos")
+            .document(siloId)
+            .update(updates)
+            .await()
+        Log.d(TAG, "Silo actualizado: $siloId")
+    }
+
+    /** Elimina un silo del usuario actual. */
+    suspend fun deleteSilo(siloId: String) {
+        val uid = currentUser?.uid ?: throw IllegalStateException("No hay usuario logueado")
+        db.collection("users")
+            .document(uid)
+            .collection("silos")
+            .document(siloId)
+            .delete()
+            .await()
+        Log.d(TAG, "Silo eliminado: $siloId")
+    }
+
+    /**
+     * Garantiza que el usuario autenticado tenga un perfil en Firestore.
+     * Repara cuentas creadas antes de que existiera el documento de perfil.
+     */
+    suspend fun ensureUserProfile(): Map<String, Any>? {
+        val user = currentUser ?: return null
+        val ref = db.collection("users").document(user.uid)
+        val existing = ref.get().await()
+        if (existing.exists()) return existing.data
+
+        val profile = hashMapOf(
+            "email" to (user.email ?: ""),
+            "name" to (user.displayName?.takeIf { it.isNotBlank() }
+                ?: user.email?.substringBefore("@")
+                ?: "Usuario"),
+            "phone" to "",
+            "company" to "",
+            "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
+            "role" to "user",
+        )
+        try {
+            ref.set(profile).await()
+            Log.d(TAG, "Perfil reparado para ${user.uid}")
+            return profile
+        } catch (e: Exception) {
+            Log.e(TAG, "No se pudo reparar el perfil: ${e.message}", e)
+            throw e
+        }
+    }
+
     /**
      * Listener en tiempo real para las alertas del usuario.
      * Emitirá la lista actualizada cada vez que cambie algo en Firestore.
@@ -227,6 +304,13 @@ class AuthManager {
     }
 
     // ─── PROFILE ───────────────────────────────────────────────────────────
+
+    /** Actualiza el nombre visible del perfil. */
+    suspend fun updateUserProfile(name: String) {
+        val uid = currentUser?.uid ?: throw IllegalStateException("No hay usuario logueado")
+        val updates = hashMapOf<String, Any>("name" to name)
+        db.collection("users").document(uid).update(updates).await()
+    }
 
     /**
      * Obtiene el perfil del usuario desde Firestore.

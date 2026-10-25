@@ -35,9 +35,12 @@ import androidx.navigation.navArgument
 import com.example.app1.ui.theme.AgrilionTokens
 import com.example.app1.ui.screens.*
 import com.example.app1.data.AppStateBaseDeDatos
+import com.example.app1.data.AuthManager
 import com.example.app1.data.SilosDataManagerBaseDeDatos
 import com.example.app1.data.SilobolsaBaseDeDatos
 import com.example.app1.data.EstadoSilo
+import com.google.firebase.auth.FirebaseUser
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -50,7 +53,13 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = AgrilionTokens.SurfaceDarkRoot,
                 ) {
-                    AgrilionApp()
+                    val authManager = remember { AuthManager.getInstance() }
+                    val user by authManager.authState.collectAsState(initial = authManager.currentUser)
+                    if (user == null) {
+                        LoginScreen(onLoginSuccess = {})
+                    } else {
+                        AgrilionApp(user)
+                    }
                 }
             }
         }
@@ -74,10 +83,39 @@ fun AgrilionTheme(content: @Composable () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AgrilionApp() {
+fun AgrilionApp(user: FirebaseUser? = null) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(user?.uid) {
+        if (user == null) {
+            AppStateBaseDeDatos.isUserLoggedIn = false
+            SilosDataManagerBaseDeDatos.clear()
+            return@LaunchedEffect
+        }
+
+        AppStateBaseDeDatos.isUserLoggedIn = true
+        AppStateBaseDeDatos.userEmail = user.email ?: ""
+        AppStateBaseDeDatos.userName =
+            user.displayName ?: user.email?.substringBefore("@") ?: "Usuario"
+
+        try {
+            AuthManager.getInstance().ensureUserProfile()
+                ?.get("name")
+                ?.toString()
+                ?.takeIf { it.isNotBlank() }
+                ?.let { AppStateBaseDeDatos.userName = it }
+        } catch (_: Exception) {
+            // Si falla el perfil, seguimos con el nombre de Firebase.
+        }
+
+        // Refresco periódico de los silos desde la AI API.
+        while (true) {
+            SilosDataManagerBaseDeDatos.refresh()
+            delay(20_000)
+        }
+    }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -378,8 +416,20 @@ fun AgrilionApp() {
                 AddSiloDialog(
                     onDismiss = { showAddSiloDialog = false },
                     onConfirm = { nuevoSilo ->
-                        SilosDataManagerBaseDeDatos.silosList.add(nuevoSilo)
                         showAddSiloDialog = false
+                        scope.launch {
+                            try {
+                                AuthManager.getInstance().createSilo(
+                                    name = nuevoSilo.nombre,
+                                    grainType = nuevoSilo.tipoGrano,
+                                    location = nuevoSilo.ubicacion,
+                                    tons = nuevoSilo.toneladas
+                                )
+                                SilosDataManagerBaseDeDatos.refresh()
+                            } catch (_: Exception) {
+                                // El error se refleja en el estado del repositorio.
+                            }
+                        }
                     }
                 )
             }

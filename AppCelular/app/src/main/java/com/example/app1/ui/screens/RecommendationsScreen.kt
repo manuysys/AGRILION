@@ -38,16 +38,17 @@ fun RecommendationsScreen() {
                 )
             }
         } else {
-            val tiposDeGrano = listOf("Trigo", "Maíz", "Soja", "Cebada", "Girasol")
-            
+            val tiposDeGrano = silos
+                .map { it.tipoGrano }
+                .filter { it.isNotBlank() && !it.equals("Sin dato", ignoreCase = true) }
+                .distinct()
+
             tiposDeGrano.forEach { grano ->
-                if (silos.any { it.tipoGrano.equals(grano, ignoreCase = true) }) {
-                    RecommendationCard(
-                        grain = AppStateBaseDeDatos.t(grano),
-                        recommendation = SilosDataManagerBaseDeDatos.getAnalisisGralPorGrano(grano)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
+                RecommendationCard(
+                    grain = AppStateBaseDeDatos.t(grano),
+                    recommendation = SilosDataManagerBaseDeDatos.getAnalisisGralPorGrano(grano)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
 

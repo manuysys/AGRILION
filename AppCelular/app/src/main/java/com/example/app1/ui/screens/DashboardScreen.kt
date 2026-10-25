@@ -1,5 +1,6 @@
 package com.example.app1.ui.screens
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,7 +16,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -41,6 +46,8 @@ fun DashboardScreen() {
     val totalCritico = silos.count { it.estado == EstadoSilo.CRITICO }
     val totalSinDatos = silos.count { it.estado == EstadoSilo.SIN_DATOS }
     val total = silos.size.toFloat()
+    val apiError = SilosDataManagerBaseDeDatos.error
+    val isLoading = SilosDataManagerBaseDeDatos.isLoading
 
     Column(
         modifier = Modifier
@@ -49,6 +56,45 @@ fun DashboardScreen() {
             .padding(16.dp)
             .verticalScroll(scrollState)
     ) {
+        if (apiError != null) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+                    .border(1.dp, AgrilionTokens.Critical, AgrilionTokens.RadiusCard),
+                shape = AgrilionTokens.RadiusCard,
+                colors = CardDefaults.cardColors(containerColor = AgrilionTokens.CriticalBg)
+            ) {
+                Text(
+                    "Sin conexión con la API: $apiError",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+        } else if (isLoading && silos.isEmpty()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                shape = AgrilionTokens.RadiusCard,
+                colors = CardDefaults.cardColors(containerColor = AgrilionTokens.SurfaceDark1)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = AgrilionTokens.Emerald500
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Actualizando datos de los silos...", color = AgrilionTokens.Zinc400, fontSize = 13.sp)
+                }
+            }
+        }
         // 1. BANNER DE ALERTA (Solo si hay datos críticos)
         if (silos.isNotEmpty() && (totalSinDatos > 0 || totalCritico > 0)) {
             Card(
@@ -82,15 +128,13 @@ fun DashboardScreen() {
         // ESTADOS DE SILOBOLSAS
         DashboardSection(AppStateBaseDeDatos.t("ESTADOS DE SILOBOLSAS")) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .background(AgrilionTokens.SurfaceDark2, CircleShape)
-                        .border(1.dp, AgrilionTokens.BorderSubtle, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(AppStateBaseDeDatos.t("Gráfico"), fontSize = 12.sp, color = AgrilionTokens.Zinc400, fontWeight = FontWeight.Bold)
-                }
+                StatusDonut(
+                    totalBueno = totalBueno,
+                    totalAlerta = totalAlerta,
+                    totalCritico = totalCritico,
+                    totalSinDatos = totalSinDatos,
+                    total = silos.size
+                )
                 Spacer(modifier = Modifier.width(20.dp))
                 Column {
                     StatusRow(AppStateBaseDeDatos.t("Bueno"), AgrilionTokens.Ok, if(total>0) (totalBueno/total)*100 else 0f)
@@ -103,13 +147,19 @@ fun DashboardScreen() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // DISTRIBUCIÓN POR TIPO DE GRANO
-        DashboardSection("${AppStateBaseDeDatos.t("DISTRIBUCIÓN POR TIPO DE GRANO")} (${if(AppStateBaseDeDatos.unidadPesoSeleccionada.contains("TN")) "TN" else "Kg"})") {
-            val granos = listOf("Trigo", "Maíz", "Soja", "Cebada", "Girasol")
-            granos.forEach { g ->
-                val tn = if (silos.isEmpty()) 0.0 else silos.filter { it.tipoGrano == g }.sumOf { it.toneladas }
-                val progress = if (total > 0) (tn / 2000000).toFloat().coerceIn(0f, 1f) else 0f
-                GrainRow(AppStateBaseDeDatos.t(g), tn, progress)
+        DashboardSection("SILOS POR TIPO DE GRANO") {
+            val counts = silos.groupingBy { it.tipoGrano.lowercase() }.eachCount()
+            if (counts.isEmpty()) {
+                Text("Sin silos registrados.", color = AgrilionTokens.Zinc400, fontSize = 13.sp)
+            } else {
+                counts.entries.sortedByDescending { it.value }.forEach { (grano, cantidad) ->
+                    GrainRow(
+                        label = grano.replaceFirstChar { it.uppercase() },
+                        value = cantidad.toDouble(),
+                        progress = if (total > 0) cantidad / total else 0f,
+                        unit = "silos"
+                    )
+                }
             }
         }
 
@@ -214,13 +264,66 @@ fun StatusRow(label: String, color: Color, percentage: Float) {
 }
 
 @Composable
-fun GrainRow(label: String, toneladas: Double, progress: Float) {
-    val valor = AppStateBaseDeDatos.convertirToneladas(toneladas)
+fun StatusDonut(
+    totalBueno: Int,
+    totalAlerta: Int,
+    totalCritico: Int,
+    totalSinDatos: Int,
+    total: Int
+) {
+    Box(modifier = Modifier.size(100.dp), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val stroke = 14.dp.toPx()
+            val inset = stroke / 2f
+            val arcSize = Size(size.width - stroke, size.height - stroke)
+            val segments = listOf(
+                totalBueno to AgrilionTokens.Ok,
+                totalAlerta to AgrilionTokens.Warn,
+                totalCritico to AgrilionTokens.Critical,
+                totalSinDatos to AgrilionTokens.Offline
+            )
+            drawArc(
+                color = AgrilionTokens.SurfaceDark2,
+                startAngle = 0f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = Offset(inset, inset),
+                size = arcSize,
+                style = Stroke(stroke)
+            )
+            if (total > 0) {
+                var startAngle = -90f
+                segments.forEach { (count, color) ->
+                    if (count > 0) {
+                        val sweep = (count.toFloat() / total) * 360f
+                        drawArc(
+                            color = color,
+                            startAngle = startAngle + 1.5f,
+                            sweepAngle = (sweep - 3f).coerceAtLeast(0f),
+                            useCenter = false,
+                            topLeft = Offset(inset, inset),
+                            size = arcSize,
+                            style = Stroke(stroke, cap = StrokeCap.Round)
+                        )
+                        startAngle += sweep
+                    }
+                }
+            }
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("$total", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
+            Text("silos", color = AgrilionTokens.Zinc500, fontSize = 10.sp)
+        }
+    }
+}
+
+@Composable
+fun GrainRow(label: String, value: Double, progress: Float, unit: String = "silos") {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
             Text(
-                text = String.format(Locale.getDefault(), "%,.0f", valor),
+                text = String.format(Locale.getDefault(), "%,.0f %s", value, unit),
                 style = TextStyle(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Black,

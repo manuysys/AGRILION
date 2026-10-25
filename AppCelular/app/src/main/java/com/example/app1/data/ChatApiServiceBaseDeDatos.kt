@@ -1,5 +1,7 @@
 package com.example.app1.data
 
+import java.util.concurrent.TimeUnit
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
@@ -16,7 +18,7 @@ data class ChatRequestBaseDeDatos(
 data class ChatResponseBaseDeDatos(
     val response: String,
     val session_id: String = "",
-    val latency_ms: Long = 0,
+    val latency_ms: Double = 0.0,
     val context_used: Map<String, Any>? = null,
     val from_cache: Boolean = false,
     val error: String? = null
@@ -37,12 +39,18 @@ interface ChatApiServiceBaseDeDatos {
     suspend fun sendMessage(@Body request: ChatRequestBaseDeDatos): ChatResponseBaseDeDatos
 
     companion object {
-        // Dirección IP local para el emulador Android (puerto 8000 del backend de Python)
-        private const val BASE_URL = "http://10.0.2.2:8000/"
-
         fun create(): ChatApiServiceBaseDeDatos {
+            // El LLM local puede tardar bastante en el primer token; el timeout
+            // por defecto de OkHttp (10 s) corta la respuesta.
+            val client = OkHttpClient.Builder()
+                .connectTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(120, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .build()
+
             return Retrofit.Builder()
-                .baseUrl(BASE_URL)
+                .baseUrl(ApiConfig.BASE_URL)
+                .client(client)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()
                 .create(ChatApiServiceBaseDeDatos::class.java)

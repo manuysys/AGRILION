@@ -21,18 +21,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.app1.data.AuthManager
 import com.example.app1.data.EstadoSilo
 import com.example.app1.data.SilosDataManagerBaseDeDatos
 import com.example.app1.data.AppStateBaseDeDatos
 import com.example.app1.data.SilobolsaBaseDeDatos
 import com.example.app1.ui.theme.AgrilionTokens
+import kotlinx.coroutines.launch
 
 @Composable
 fun MySilosScreen(onSiloClick: (String) -> Unit) {
     var searchQuery by remember { mutableStateOf("") }
-    
+    val scope = rememberCoroutineScope()
+
     val silosList = SilosDataManagerBaseDeDatos.silosList
-    
+    val isLoading = SilosDataManagerBaseDeDatos.isLoading
+    val error = SilosDataManagerBaseDeDatos.error
+
     val filteredSilos = if (searchQuery.isBlank()) {
         silosList
     } else {
@@ -69,11 +74,17 @@ fun MySilosScreen(onSiloClick: (String) -> Unit) {
                 modifier = Modifier.fillMaxSize().padding(bottom = 100.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "No hay silobolsas registradas",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = AgrilionTokens.Zinc400
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (isLoading) {
+                        CircularProgressIndicator(color = AgrilionTokens.Emerald500)
+                        Spacer(Modifier.height(12.dp))
+                    }
+                    Text(
+                        text = error ?: "No hay silobolsas registradas",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (error != null) AgrilionTokens.Critical else AgrilionTokens.Zinc400
+                    )
+                }
             }
         } else {
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
@@ -81,7 +92,32 @@ fun MySilosScreen(onSiloClick: (String) -> Unit) {
                     SiloCardWithMenu(
                         silo = silo,
                         onSiloClick = { onSiloClick(silo.id) },
-                        onDelete = { SilosDataManagerBaseDeDatos.silosList.remove(silo) }
+                        onEdit = { updated ->
+                            scope.launch {
+                                try {
+                                    AuthManager.getInstance().updateSilo(
+                                        siloId = updated.id,
+                                        name = updated.nombre,
+                                        grainType = updated.tipoGrano,
+                                        location = updated.ubicacion,
+                                        tons = updated.toneladas
+                                    )
+                                } catch (_: Exception) {
+                                    // Silo sin documento en Firestore.
+                                }
+                                SilosDataManagerBaseDeDatos.refresh()
+                            }
+                        },
+                        onDelete = {
+                            scope.launch {
+                                try {
+                                    AuthManager.getInstance().deleteSilo(silo.id)
+                                } catch (_: Exception) {
+                                    // Silo sin documento en Firestore (solo sensor).
+                                }
+                                SilosDataManagerBaseDeDatos.refresh()
+                            }
+                        }
                     )
                 }
             }
@@ -90,7 +126,12 @@ fun MySilosScreen(onSiloClick: (String) -> Unit) {
 }
 
 @Composable
-fun SiloCardWithMenu(silo: SilobolsaBaseDeDatos, onSiloClick: () -> Unit, onDelete: () -> Unit) {
+fun SiloCardWithMenu(
+    silo: SilobolsaBaseDeDatos,
+    onSiloClick: () -> Unit,
+    onEdit: (SilobolsaBaseDeDatos) -> Unit,
+    onDelete: () -> Unit
+) {
     var showMenu by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
 
@@ -134,6 +175,32 @@ fun SiloCardWithMenu(silo: SilobolsaBaseDeDatos, onSiloClick: () -> Unit, onDele
                         color = AgrilionTokens.Zinc500
                     )
                 }
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "T ${"%.1f".format(silo.temperatura)}°C",
+                        color = AgrilionTokens.Emerald500,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "H ${"%.1f".format(silo.humedad)}%",
+                        color = AgrilionTokens.Emerald500,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "CO₂ ${silo.co2.toInt()} ppm",
+                        color = if (silo.co2 > 1200) AgrilionTokens.Critical else AgrilionTokens.Warn,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(
+                    "Riesgo ${silo.riskScore}/100 · ${silo.ultimaActualizacion}",
+                    color = AgrilionTokens.Zinc500,
+                    fontSize = 10.sp
+                )
             }
 
             Box {
@@ -168,10 +235,7 @@ fun SiloCardWithMenu(silo: SilobolsaBaseDeDatos, onSiloClick: () -> Unit, onDele
             silo = silo,
             onDismiss = { showEditDialog = false },
             onConfirm = { updatedSilo ->
-                val index = SilosDataManagerBaseDeDatos.silosList.indexOf(silo)
-                if (index != -1) {
-                    SilosDataManagerBaseDeDatos.silosList[index] = updatedSilo
-                }
+                onEdit(updatedSilo)
                 showEditDialog = false
             }
         )

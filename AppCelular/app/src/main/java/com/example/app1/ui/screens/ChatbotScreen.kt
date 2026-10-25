@@ -35,6 +35,7 @@ import com.example.app1.data.ChatManagerBaseDeDatos
 import com.example.app1.data.EstadoSilo
 import com.example.app1.data.SilosDataManagerBaseDeDatos
 import com.example.app1.ui.theme.AgrilionTokens
+import kotlin.math.roundToInt
 
 @Composable
 fun ChatbotScreen(chatViewModel: ChatViewModelBaseDeDatos = viewModel()) {
@@ -153,7 +154,7 @@ fun ChatbotScreen(chatViewModel: ChatViewModelBaseDeDatos = viewModel()) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Riesgo promedio: ${if (activeSilos.isEmpty()) 0 else 12}/100",
+                        text = "Riesgo promedio: ${if (activeSilos.isEmpty()) 0 else activeSilos.map { it.riskScore }.average().roundToInt()}/100",
                         fontSize = 12.sp,
                         color = AgrilionTokens.Zinc400
                     )

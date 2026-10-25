@@ -11,7 +11,25 @@ data class SilobolsaBaseDeDatos(
     val toneladas: Double,
     val ubicacion: String = "", // Nuevo campo de ubicación
     val diagnosticoSemanal: String = "Pendiente de análisis por IA...",
-    val tendenciaCritica: Boolean = false
+    val tendenciaCritica: Boolean = false,
+    // Lecturas reales de la AI API / InfluxDB
+    val temperatura: Double = 0.0,
+    val humedad: Double = 0.0,
+    val co2: Double = 0.0,
+    val presion: Double? = null,
+    val riskScore: Int = 0,
+    val riskLevel: String = "NORMAL",
+    val deviceId: String? = null,
+    val history: List<SensorReadingBaseDeDatos> = emptyList(),
+    val prediction: List<SensorReadingBaseDeDatos> = emptyList()
+)
+
+data class SensorReadingBaseDeDatos(
+    val timestamp: String,
+    val temperature: Double,
+    val humidity: Double,
+    val co2: Double,
+    val pressure: Double? = null
 )
 
 enum class EstadoSilo(val color: Color, val texto: String) {
