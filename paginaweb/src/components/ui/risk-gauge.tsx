@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getRiskBand, THRESHOLDS } from '@/lib/thresholds';
+import { getRiskBand } from '@/lib/thresholds';
 
 interface RiskGaugeProps {
   value: number; // 0-100
@@ -54,11 +54,6 @@ export default function RiskGauge({
   const circumference = Math.PI * radius;
   const progress = (animatedValue / 100) * circumference;
 
-  // Proporciones de las bandas (alineadas con THRESHOLDS.riskScore)
-  const normalPct = THRESHOLDS.riskScore.normal.max / 100; // 0-30
-  const warnPct = (THRESHOLDS.riskScore.warning.max - THRESHOLDS.riskScore.warning.min) / 100; // 30-70
-  const dangerPct = 1 - normalPct - warnPct; // 70-100
-
   const arcPath = `
     M ${cfg.strokeWidth} ${cy}
     A ${radius} ${radius} 0 0 1 ${cfg.width - cfg.strokeWidth} ${cy}
@@ -79,39 +74,6 @@ export default function RiskGauge({
           stroke="rgba(255,255,255,0.1)"
           strokeWidth={cfg.strokeWidth}
           strokeLinecap="round"
-        />
-
-        {/* Green band (0-30) */}
-        <path
-          d={arcPath}
-          fill="none"
-          stroke="var(--state-ok)"
-          strokeWidth={cfg.strokeWidth}
-          strokeLinecap="butt"
-          strokeDasharray={`${normalPct * circumference} ${circumference}`}
-          opacity={0.15}
-        />
-
-        {/* Yellow band (30-70) */}
-        <path
-          d={arcPath}
-          fill="none"
-          stroke="var(--state-warn)"
-          strokeWidth={cfg.strokeWidth}
-          strokeDasharray={`${warnPct * circumference} ${circumference}`}
-          strokeDashoffset={`${-normalPct * circumference}`}
-          opacity={0.15}
-        />
-
-        {/* Red band (70-100) */}
-        <path
-          d={arcPath}
-          fill="none"
-          stroke="var(--state-critical)"
-          strokeWidth={cfg.strokeWidth}
-          strokeDasharray={`${dangerPct * circumference} ${circumference}`}
-          strokeDashoffset={`${-(normalPct + warnPct) * circumference}`}
-          opacity={0.15}
         />
 
         {/* Active progress */}
