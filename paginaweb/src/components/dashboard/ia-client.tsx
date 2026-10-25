@@ -13,6 +13,34 @@ interface IAClientProps {
   alerts: Alert[];
 }
 
+type PredictionData = {
+  silo_id: string;
+  status: 'ok' | 'insufficient_data';
+  readings: number;
+  required: number;
+  predictions: Array<{
+    step: number;
+    timestamp: string;
+    temperature: number;
+    humidity: number | null;
+    co2: number | null;
+  }>;
+  anomalies: {
+    is_anomaly?: boolean;
+    affected_sensors?: string[];
+  };
+  risk: {
+    score: number;
+    level: string;
+  } | null;
+  model: string;
+};
+
+type ModelStatus = {
+  model_loaded: boolean;
+  n_parameters?: number;
+};
+
 // ─── Local fallback responses (when AI API is not available) ─────────────────
 
 function localFallbackResponse(query: string, silos: SiloBag[]): string {
@@ -78,6 +106,8 @@ export default function IAClient({ silos, alerts }: IAClientProps) {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [apiConnected, setApiConnected] = useState<boolean | null>(null); // null = checking
+  const [prediction, setPrediction] = useState<PredictionData | null>(null);
+  const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const sessionIdRef = useRef<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -111,6 +141,33 @@ export default function IAClient({ silos, alerts }: IAClientProps) {
     }
     checkApi();
   }, []);
+
+  // Cargar estado del modelo LSTM y predicción del primer silo disponible
+  useEffect(() => {
+    const siloId = silos[0]?.id;
+    if (!siloId) return;
+
+    let cancelled = false;
+    Promise.all([
+      fetch(`/api/ai/silos/${encodeURIComponent(siloId)}/prediction`).then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/ai/model/status').then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([pred, model]) => {
+        if (cancelled) return;
+        setPrediction(pred);
+        setModelStatus(model);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPrediction(null);
+          setModelStatus(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [silos]);
 
   const handleSend = async (text?: string) => {
     const query = text ?? input;
@@ -247,6 +304,74 @@ export default function IAClient({ silos, alerts }: IAClientProps) {
                 Alertas activas: <span className="text-amber-400 font-medium">{activeAlerts.length}</span>
               </span>
             </div>
+          </motion.div>
+
+          {/* Modelo LSTM + predicción */}
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className="rounded-2xl border border-white/10 bg-zinc-900/60 backdrop-blur-xl p-6"
+          >
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <BrainCircuit size={18} className="text-emerald-400" />
+                <h3 className="text-lg font-semibold text-white">
+                  Análisis LSTM
+                </h3>
+              </div>
+              <span className={`text-[10px] px-2 py-1 rounded-full border ${
+                modelStatus?.model_loaded
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                  : 'bg-zinc-800 text-zinc-400 border-white/10'
+              }`}>
+                {modelStatus?.model_loaded ? 'Modelo cargado' : 'Modelo no disponible'}
+              </span>
+            </div>
+
+            {prediction?.status === 'ok' ? (
+              <div className="space-y-4">
+                <p className="text-sm text-zinc-400">
+                  Predicción próximas 6 h para <span className="text-white font-medium">{prediction.silo_id}</span>
+                  {prediction.risk ? ` · Riesgo ${prediction.risk.score}/100 (${prediction.risk.level})` : ''}
+                </p>
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                  {(prediction.predictions ?? []).map((p) => (
+                    <div key={p.step} className="p-3 rounded-xl bg-white/5 border border-white/5">
+                      <p className="text-[10px] uppercase tracking-widest text-zinc-500">+{p.step} h</p>
+                      <p className="font-data text-sm text-white mt-1">{p.temperature} °C</p>
+                      <p className="font-data text-xs text-zinc-400">{p.humidity ?? '—'} % · {p.co2 ?? '—'} ppm</p>
+                    </div>
+                  ))}
+                </div>
+                {prediction.anomalies?.is_anomaly ? (
+                  <p className="text-xs text-amber-400">
+                    Anomalía detectada{prediction.anomalies.affected_sensors?.length
+                      ? ` en ${prediction.anomalies.affected_sensors.join(', ')}`
+                      : ''}.
+                  </p>
+                ) : (
+                  <p className="text-xs text-zinc-500">
+                    Sin anomalías por consenso (Z-Score + Media Móvil + Isolation Forest).
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="text-sm text-zinc-400">
+                <p>
+                  {prediction
+                    ? `Recolectando datos: ${prediction.readings}/${prediction.required} lecturas para que el LSTM pueda predecir.`
+                    : 'No se pudo consultar el análisis del modelo.'}
+                </p>
+                <p className="text-xs text-zinc-500 mt-2">
+                  El LSTM necesita 24 lecturas consecutivas. El dispositivo envía una cada ~20 s.
+                </p>
+              </div>
+            )}
+
+            <p className="text-[10px] text-zinc-600 mt-4">
+              Motor: LSTM + Isolation Forest. XGBoost no está implementado en esta versión.
+            </p>
           </motion.div>
 
           {/* Interpretations */}

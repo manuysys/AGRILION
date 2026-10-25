@@ -62,7 +62,7 @@ export default function DashboardHero({
     >
       {/* Background Shader / Gradients */}
       <div className="absolute inset-0 z-0 opacity-40 mix-blend-screen pointer-events-none">
-        {systemState === 'ok' && <WebGLShader />}
+        <WebGLShader tone={systemState} />
       </div>
       <div className={`absolute inset-0 z-0 opacity-30 bg-gradient-to-t ${isCritical ? 'from-red-900 via-red-950/50' : isWarn ? 'from-amber-900 via-amber-950/50' : 'from-emerald-900'} to-transparent pointer-events-none`} />
 

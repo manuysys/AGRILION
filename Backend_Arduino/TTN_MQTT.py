@@ -43,7 +43,7 @@ def on_connect_hivemq(client, userdata, flags, reason_code, properties):
     else:
         print("❌ Error conexión HiveMQ:", reason_code)
 
-def on_disconnect_hivemq(client, userdata, reason_code, properties):
+def on_disconnect_hivemq(client, userdata, disconnect_flags, reason_code, properties):
     print("⚠️ Desconectado de HiveMQ, intentando reconectar...")
     while True:
         try:
@@ -101,7 +101,7 @@ def on_connect_ttn(client, userdata, flags, reason_code, properties):
     else:
         print("❌ Error conexión TTN:", reason_code)
 
-def on_disconnect_ttn(client, userdata, reason_code, properties):
+def on_disconnect_ttn(client, userdata, disconnect_flags, reason_code, properties):
     print("⚠️ Desconectado de TTN, intentando reconectar...")
     while True:
         try:

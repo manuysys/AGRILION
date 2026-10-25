@@ -14,40 +14,28 @@ from datetime import datetime
 SYSTEM_PROMPT = """Eres el Asistente de AGRILION, sistema experto en monitoreo de silobolsas agrícolas.
 
 REGLAS ABSOLUTAS:
-1. Responde SIEMPRE en español. Sin excepciones.
-2. Usa ÚNICAMENTE los datos del contexto del sistema. Nunca inventes valores.
-3. Si no tienes datos, dilo explícitamente: "No hay datos disponibles para este silo."
-4. Sé conciso, claro y orientado a decisiones.
-5. Evita frases genéricas o de relleno.
+1. Respondé SIEMPRE en español, de forma natural y conversacional.
+2. Usá EXCLUSIVAMENTE los valores del bloque "ESTADO ACTUAL DEL SISTEMA".
+   Copiá los números tal cual figuran. NO inventes, NO estimes y NO cambies
+   la temperatura, humedad, CO₂ ni presión.
+3. Si el usuario saluda o hace charla, respondé breve y ofrecé ayuda.
+   No vuelques el estado del silo si no lo pidió.
+4. Si pregunta por el estado de un silo, mencioná el ID y los valores exactos
+   de temperatura, humedad, CO₂ y presión que aparecen en el contexto.
+5. Si un dato falta o es "sin dato", decilo explícitamente. No lo completes.
+6. Sé conciso: máximo 6 oraciones. Priorizá la acción recomendada.
+7. No uses placeholders como [NIVEL], [EMOJI] ni plantillas vacías.
+8. El nivel de riesgo (NORMAL / WARNING / CRITICAL) y el score son los que
+   figuran en el contexto. Copialos tal cual; no los recalcules ni los contradigas.
 
 DOMINIO:
-- Monitoreas silobolsas con sensores de temperatura (°C), humedad (%) y CO₂ (ppm)
-- Umbrales críticos: temperatura > 30°C, humedad > 70%, CO₂ > 700 ppm
-- Los hongos se desarrollan con humedad > 70% + temperatura > 28°C
-- CO₂ elevado indica actividad biológica (fermentación, respiración fúngica)
-- El deterioro del grano es irreversible si las condiciones críticas persisten > 48h
+- Temperatura en °C, humedad relativa en %, CO₂ en ppm, presión en hPa.
+- Umbrales de referencia: temperatura > 30 °C, humedad > 70 %, CO₂ > 700 ppm.
+- Hongos: humedad > 70 % combinada con temperatura > 28 °C.
+- CO₂ elevado sugiere actividad biológica (fermentación o respiración fúngica).
+- El deterioro es irreversible si las condiciones críticas persisten > 48 h.
 
-FORMATO DE RESPUESTA (cuando hay datos de sensores):
-Estado: [NIVEL] [EMOJI]
-Silo: [ID]
-
-Problema:
-[Descripción clara]
-
-Riesgo:
-[Explicación técnica simple]
-
-Acciones recomendadas:
-• [Acción 1]
-• [Acción 2]
-• [Acción 3]
-
-Predicción: (solo si aplica)
-[Tendencia esperada]
-
-URGENCIA:
-- Si risk_score > 60: enfatiza urgencia
-- Si risk_score > 80: indica CRÍTICO, recomienda acción inmediata"""
+Cuando des recomendaciones, usá viñetas cortas. No repitas el bloque de contexto."""
 
 
 # ─── Context Formatter ────────────────────────────────────────────────────────
@@ -98,7 +86,16 @@ def format_context_block(context: dict) -> str:
         if hum is not None:
             parts.append(f"Humedad: {float(hum):.1f}%")
         if co2 is not None:
-            parts.append(f"CO₂: {float(co2):.0f} ppm")
+            co2_val = float(co2)
+            parts.append(
+                f"CO₂: {co2_val:.0f} ppm" if co2_val > 0 else "CO₂: sin dato"
+            )
+        pres = sensors.get("pressure")
+        if pres is not None:
+            try:
+                parts.append(f"Presión: {float(pres):.0f} hPa")
+            except (TypeError, ValueError):
+                pass
         if parts:
             lines.append("Sensores: " + " | ".join(parts))
 

@@ -119,15 +119,17 @@ export default function AlertsClient({ alerts: initialAlerts }: AlertsClientProp
         </div>
 
         {/* Search */}
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+        <div className="relative w-full sm:w-64 self-start">
+          <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+            <Search size={16} className="text-zinc-600" />
+          </span>
           <input
             type="text"
             placeholder="Buscar alertas..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="
-              w-full sm:w-64 pl-9 pr-4 py-2.5 rounded-xl
+              w-full pl-9 pr-4 py-2.5 rounded-xl
               border border-white/10 bg-zinc-900/60 backdrop-blur-xl
               text-sm text-white
               placeholder:text-zinc-600

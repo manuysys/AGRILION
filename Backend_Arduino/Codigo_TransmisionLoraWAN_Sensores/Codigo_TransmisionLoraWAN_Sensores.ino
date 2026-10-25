@@ -36,13 +36,19 @@ Adafruit_BME280 bme;
 Adafruit_SHT31  sht30 = Adafruit_SHT31();
 SCD4x           scd41(SCD4x_SENSOR_SCD41);
 Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
+bool scd41_initialized = false;
 
 #define PIN_INTERRUPCION GPIO5
 
-// CO2 (SCD41): el sensor físico actual no acepta single-shot (NACK), así que
-// el payload va con co2=0. Poner en 0 para no intentar leerlo (menos ruido
-// serie); con un SCD41 sano, en 1 funciona directo.
+// CO2 (SCD41): el sensor responde correctamente en modo single-shot.
+// Se habilita para enviar CO2 real en el payload.
 #define AGRILION_CO2 1
+
+// Tiempo de estabilización del SCD41 antes de medir. El datasheet recomienda
+// varios minutos tras un power-up; 30 s es un compromiso razonable para no
+// consumir demasiada batería. Con esto se evita que cada lectura arranque
+// desde un estado frío y varíe demasiado.
+#define AGRILION_CO2_WARMUP_MS 30000
 
 volatile bool flag_interrupcion  = false;
 bool     impactoPendiente        = false;
@@ -140,7 +146,11 @@ void prepareTxFrame(uint8_t port)
   pinMode(SDA, INPUT);
   pinMode(SCL, INPUT);
   digitalWrite(Vext, LOW);
+#if AGRILION_CO2
+  delay(AGRILION_CO2_WARMUP_MS);
+#else
   delay(1500);
+#endif
 
   Wire.begin();          // reinicia el controlador I2C tras el corte de energía
   Wire.setClock(50000);
@@ -175,6 +185,16 @@ void prepareTxFrame(uint8_t port)
   // La librería devuelve TRUE cuando hay medición fresca (ver Example8).
   uint16_t co2 = 0;
 #if AGRILION_CO2
+  // Inicialización diferida: se hace después del join, no en setup.
+  if (!scd41_initialized) {
+    if (scd41.begin(Wire, false)) {
+      scd41.setAutomaticSelfCalibrationEnabled(false);
+      scd41_initialized = true;
+    } else {
+      Serial.println("WARNING: SCD41 no detectado en prepareTxFrame.");
+    }
+  }
+
   bool medicionLista = false;
 
   // Compensación de presión (BME280 en hPa -> librería en Pa)
@@ -257,14 +277,9 @@ void setup()
   }
 
   // SCD41
-#if AGRILION_CO2
-  // measBegin=false: no arrancar medición periódica (usamos single-shot)
-  // autoCalibrate=true, skipStopPeriodicMeasurements=false (detiene una
-  // periódica previa si el sensor venía midiendo)
-  if (!scd41.begin(Wire, false)) {
-    Serial.println("WARNING: SCD41 no detectado en setup.");
-  }
-#endif
+// El SCD41 se inicializa después del join, dentro de prepareTxFrame.
+// Inicializarlo en setup (antes del join LoRaWAN) impedía que la placa
+// se uniera a la red.
   delay(600);
 
   configurarADXL345();

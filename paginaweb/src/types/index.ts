@@ -4,6 +4,7 @@ export interface SensorReading {
   temperature: number;
   humidity: number;
   co2: number;
+  pressure?: number | null;
 }
 
 // ── Sensor Status ──
@@ -88,6 +89,7 @@ export interface ChartDataPoint {
   temperature: number;
   humidity: number;
   co2: number;
+  pressure?: number | null;
   tempThresholdWarn?: number;
   tempThresholdCritical?: number;
   humThresholdWarn?: number;

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { History } from 'lucide-react';
-import type { SiloBag } from '@/types';
+import { History, Loader2 } from 'lucide-react';
+import type { SiloBag, SensorReading } from '@/types';
 import TimelineChart from '@/components/ui/timeline-chart';
 
 interface HistoryClientProps {
@@ -12,9 +12,52 @@ interface HistoryClientProps {
 
 export default function HistoryClient({ silos }: HistoryClientProps) {
   const [selectedSilo, setSelectedSilo] = useState(silos[0]?.id ?? '');
-  const [selectedMetric, setSelectedMetric] = useState<'temperature' | 'humidity' | 'co2'>('temperature');
+  const [selectedMetric, setSelectedMetric] = useState<'temperature' | 'humidity' | 'co2' | 'pressure'>('temperature');
+  const [readings, setReadings] = useState<SensorReading[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const silo = silos.find((s) => s.id === selectedSilo);
+
+  useEffect(() => {
+    if (!selectedSilo) {
+      setReadings([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    fetch(`/api/ai/silos/${encodeURIComponent(selectedSilo)}/history?hours=24`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        const history = Array.isArray(data?.history) ? data.history : [];
+        setReadings(
+          history.map((h: { timestamp: string; temperature: number; humidity: number; co2: number; pressure?: number | null }) => ({
+            timestamp: h.timestamp,
+            temperature: Number(h.temperature ?? 0),
+            humidity: Number(h.humidity ?? 0),
+            co2: Number(h.co2 ?? 0),
+            pressure: h.pressure === null || h.pressure === undefined ? null : Number(h.pressure),
+          }))
+        );
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Error al cargar el histórico');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSilo]);
 
   return (
     <motion.div
@@ -55,7 +98,7 @@ export default function HistoryClient({ silos }: HistoryClientProps) {
 
         {/* Metric selector */}
         <div className="flex gap-1 bg-white/5 p-1 rounded-xl border border-white/5">
-          {(['temperature', 'humidity', 'co2'] as const).map((m) => {
+          {(['temperature', 'humidity', 'co2', 'pressure'] as const).map((m) => {
             const isActive = selectedMetric === m;
             return (
               <button
@@ -78,7 +121,7 @@ export default function HistoryClient({ silos }: HistoryClientProps) {
                   />
                 )}
                 <span className="relative z-10">
-                  {m === 'temperature' ? 'Temperatura' : m === 'humidity' ? 'Humedad' : 'CO₂'}
+                  {m === 'temperature' ? 'Temperatura' : m === 'humidity' ? 'Humedad' : m === 'co2' ? 'CO₂' : 'Presión'}
                 </span>
               </button>
             );
@@ -90,16 +133,32 @@ export default function HistoryClient({ silos }: HistoryClientProps) {
       {silo ? (
         <motion.div
           key={`${selectedSilo}-${selectedMetric}`}
-          initial={{ opacity: 0, y: 10 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
           className="rounded-2xl border border-white/10 bg-zinc-900/60 backdrop-blur-xl p-4 lg:p-6"
         >
-          <TimelineChart
-            data={silo.readings24h}
-            metric={selectedMetric}
-            height={350}
-          />
+          {loading ? (
+            <div className="flex items-center justify-center text-sm text-zinc-500" style={{ minHeight: 390 }}>
+              <Loader2 size={18} className="animate-spin mr-2" />
+              Cargando histórico...
+            </div>
+          ) : error ? (
+            <div className="flex items-center justify-center text-sm text-red-400" style={{ minHeight: 390 }}>
+              {error}
+            </div>
+          ) : readings.length === 0 ? (
+            <div className="flex flex-col items-center justify-center text-sm text-zinc-500" style={{ minHeight: 390 }}>
+              <History size={28} className="text-zinc-600 mb-2" />
+              Aún no hay lecturas guardadas para {selectedSilo}
+            </div>
+          ) : (
+            <TimelineChart
+              data={readings}
+              metric={selectedMetric}
+              height={350}
+            />
+          )}
         </motion.div>
       ) : (
         <div className="p-12 rounded-2xl glass-dark border border-white/10 text-center">
@@ -107,37 +166,6 @@ export default function HistoryClient({ silos }: HistoryClientProps) {
           <p className="text-sm text-zinc-500">Seleccioná una silobolsa para ver su histórico</p>
         </div>
       )}
-
-      {/* All silos comparison */}
-      <div>
-        <h3 className="text-lg font-semibold text-white mb-4">
-          Comparativa entre silobolsas
-        </h3>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {silos.filter(s => s.state !== 'offline').slice(0, 4).map((s, i) => (
-            <motion.div
-              key={s.id}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.08, duration: 0.5 }}
-              className="rounded-2xl border border-white/10 bg-zinc-900/60 backdrop-blur-xl p-4"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-white">
-                  {s.id} — {s.name}
-                </span>
-                <span className="text-xs text-zinc-500">{s.grainType}</span>
-              </div>
-              <TimelineChart
-                data={s.readings24h}
-                metric={selectedMetric}
-                height={120}
-                simplified
-              />
-            </motion.div>
-          ))}
-        </div>
-      </div>
     </motion.div>
   );
 }

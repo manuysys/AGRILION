@@ -60,15 +60,33 @@ reintenta por diseño en FSB1 (915.2) para siempre. El timer propio
 sin unir: al volver el gateway, el primer intento del arranque va en FSB2 y el
 nodo se recupera solo en ≤ 3 minutos.
 
-## Estado del SCD41 (CO2)
+## Estado del SCD41/SCD40 (CO2)
 
-El sensor físico actual responde en I2C (0x62) pero **no acepta
-`measureSingleShot()`** (NACK) — pareciera una variante/clon sin ese modo. Por
-eso el payload viaja con `co2 = 0`. Flag `AGRILION_CO2`:
+El sensor físico actual responde en I2C (0x62) pero la librería lo detecta
+como **SCD40** (feature set `0x2000`), no SCD41. El SCD40 **no soporta
+`measureSingleShot()`** (exclusivo del SCD41), por eso el comando se rechaza.
+Además, la lectura del número de serie falla por CRC y el bus muestra NACKs
+intermitentes.
 
-- `1` (actual): intenta leer (imprime el warning; si algún día se cambia por un
-  SCD41 sano, funciona directo).
+Se probó la medición periódica (compatible con SCD40): `startPeriodicMeasurement()`
+a veces da ACK, pero `data-ready` nunca se activa y `readMeasurement()` no
+devuelve datos. El sketch standalone tampoco lo detecta. Conclusión: hay un
+problema de hardware/alimentación/I2C además del modo incorrecto.
+
+Por eso el payload viaja con `co2 = 0` y el dashboard lo muestra como
+**"Sin dato"** (no como 0 ppm). Flag `AGRILION_CO2`:
+
+- `1` (actual): intenta leer e imprime el warning.
 - `0`: no lo toca (menos ruido en serie).
+
+Para reintentar:
+
+1. Alimentar el módulo con la tensión correcta (3.3 V o 5 V según el módulo),
+   con pull-ups de 4.7 kΩ y cables cortos.
+2. Probar el sensor solo en el bus I2C (sin BME280/SHT30/ADXL) y con otro módulo
+   SCD40/SCD41 conocido.
+3. Si es SCD41: single-shot. Si es SCD40: medición periódica **no bloqueante**
+   (no esperar 5-8 s dentro de `prepareTxFrame`, porque rompe el join/TX).
 
 Nota histórica: `scd41.begin(Wire, true)` arranca medición periódica aunque
 falle la detección — el calentador (~200 mA en pulsos) tumbaba la radio. Con

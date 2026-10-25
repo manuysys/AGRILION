@@ -253,10 +253,16 @@ class ChatbotService:
                 df = self.ai_service.repo.get_recent_readings(silo_id, n=5)
                 if not df.empty:
                     last = df.iloc[-1]
+                    pressure = last.get("pressure")
                     sensor_values = {
                         "temperature": float(last.get("temperature", 0)),
                         "humidity": float(last.get("humidity", 0)),
                         "co2": float(last.get("co2", 0)),
+                        "pressure": (
+                            round(float(pressure), 1)
+                            if pressure is not None and str(pressure) != "nan"
+                            else None
+                        ),
                     }
             except Exception as e:
                 logger.warning(f"Could not fetch readings for {silo_id}: {e}")

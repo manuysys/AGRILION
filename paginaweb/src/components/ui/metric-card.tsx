@@ -1,6 +1,6 @@
 'use client';
 
-import { Thermometer, Droplets, Wind, LucideIcon } from 'lucide-react';
+import { Thermometer, Droplets, Wind, Gauge, LucideIcon } from 'lucide-react';
 import { formatDelta, getTrendArrow } from '@/lib/formatters';
 
 interface MetricCardProps {
@@ -9,7 +9,7 @@ interface MetricCardProps {
   unit?: string;
   previous?: number;
   current: number;
-  icon?: 'temperature' | 'humidity' | 'co2';
+  icon?: 'temperature' | 'humidity' | 'co2' | 'pressure';
   state?: 'ok' | 'warn' | 'critical';
   sparklineData?: number[];
   compact?: boolean;
@@ -20,6 +20,7 @@ const iconMap: Record<string, LucideIcon> = {
   temperature: Thermometer,
   humidity: Droplets,
   co2: Wind,
+  pressure: Gauge,
 };
 
 const stateColors = {

@@ -50,10 +50,21 @@ export function formatHumidity(value: number): string {
 }
 
 /**
- * Format CO2 with unit
+ * Format CO2 with unit.
+ * El SCD4x actual no entrega medición: el payload viaja con 0. Mostrar
+ * "Sin dato" evita que un 0 ppm se interprete como una medición real.
  */
 export function formatCO2(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return 'Sin dato';
   return `${Math.round(value)} ppm`;
+}
+
+/**
+ * Format atmospheric pressure with unit (null = sin dato)
+ */
+export function formatPressure(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return 'Sin dato';
+  return `${value.toFixed(0)} hPa`;
 }
 
 /**

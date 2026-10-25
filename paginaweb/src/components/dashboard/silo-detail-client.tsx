@@ -10,7 +10,8 @@ import RiskGauge from '@/components/ui/risk-gauge';
 import TimelineChart from '@/components/ui/timeline-chart';
 import AlertCard from '@/components/ui/alert-card';
 import AnomalyBadge from '@/components/ui/anomaly-badge';
-import { formatTemp, formatHumidity, formatCO2, formatBattery, formatRelativeTime, formatFullDate, getFreshnessColor } from '@/lib/formatters';
+import { BeamsBackground } from '@/components/ui/beams-background';
+import { formatTemp, formatHumidity, formatCO2, formatPressure, formatBattery, formatRelativeTime, formatFullDate, getFreshnessColor } from '@/lib/formatters';
 import { getTemperatureState, getHumidityState, getCO2State, getBatteryState } from '@/lib/thresholds';
 
 interface SiloDetailClientProps {
@@ -34,6 +35,9 @@ export default function SiloDetailClient({ silo }: SiloDetailClientProps) {
   const batteryState = getBatteryState(silo.sensor.battery);
   const isCritical = silo.state === 'critical';
 
+  const beamTone =
+    silo.state === 'critical' ? 'critical' : silo.state === 'warn' ? 'warn' : 'ok';
+
   return (
     <motion.div
       variants={stagger}
@@ -49,6 +53,10 @@ export default function SiloDetailClient({ silo }: SiloDetailClientProps) {
           border ${isCritical ? 'border-red-500/40 shadow-[0_0_60px_rgba(239,68,68,0.15)]' : 'border-white/10'}
         `}
       >
+        <div className="absolute inset-0 z-0 opacity-50 pointer-events-none">
+          <BeamsBackground tone={beamTone} intensity="strong" beamCount={20} />
+        </div>
+
         {isCritical && (
           <div className="absolute inset-0 bg-gradient-to-br from-red-900/20 to-transparent pointer-events-none" />
         )}
@@ -134,7 +142,7 @@ export default function SiloDetailClient({ silo }: SiloDetailClientProps) {
       </motion.div>
 
       {/* Metric Cards */}
-      <motion.div variants={fadeUp} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <motion.div variants={fadeUp} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <MetricCard
           label="Temperatura"
           value={formatTemp(silo.currentReading.temperature)}
@@ -162,6 +170,15 @@ export default function SiloDetailClient({ silo }: SiloDetailClientProps) {
           state={getCO2State(silo.currentReading.co2)}
           sparklineData={silo.readings24h.map((r) => r.co2)}
         />
+        <MetricCard
+          label="Presión"
+          value={formatPressure(silo.currentReading.pressure)}
+          current={silo.currentReading.pressure ?? 0}
+          previous={silo.previousReading?.pressure ?? undefined}
+          icon="pressure"
+          state="ok"
+          sparklineData={silo.readings24h.map((r) => r.pressure ?? 0)}
+        />
       </motion.div>
 
       {/* Timeline Charts */}
@@ -178,7 +195,7 @@ export default function SiloDetailClient({ silo }: SiloDetailClientProps) {
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="rounded-xl border border-white/10 bg-zinc-900/60 backdrop-blur-xl p-4 lg:p-6">
             <TimelineChart
               data={silo.readings24h}
@@ -190,6 +207,13 @@ export default function SiloDetailClient({ silo }: SiloDetailClientProps) {
             <TimelineChart
               data={silo.readings24h}
               metric="co2"
+              height={180}
+            />
+          </div>
+          <div className="rounded-xl border border-white/10 bg-zinc-900/60 backdrop-blur-xl p-4 lg:p-6">
+            <TimelineChart
+              data={silo.readings24h}
+              metric="pressure"
               height={180}
             />
           </div>

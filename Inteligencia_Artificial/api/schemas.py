@@ -20,7 +20,8 @@ class SensorReading(BaseModel):
     timestamp: datetime
     temperature: float = Field(..., ge=-10, le=60, description="Temperatura en °C")
     humidity: float = Field(..., ge=0, le=100, description="Humedad relativa en %")
-    co2: float = Field(..., ge=200, le=5000, description="CO2 en ppm")
+    co2: float = Field(..., ge=0, le=5000, description="CO2 en ppm (0 = sensor no disponible)")
+    presion: Optional[float] = Field(default=None, ge=0, le=2000, description="Presión en hPa")
     silo_id: str = Field(default="SILO_001", description="ID del silobolsa")
 
 
@@ -130,7 +131,8 @@ class IngestRequest(BaseModel):
     timestamp: Optional[str] = None  # defaults to now
     temperature: float = Field(..., ge=-10, le=60)
     humidity: float = Field(..., ge=0, le=100)
-    co2: float = Field(..., ge=200, le=5000)
+    co2: float = Field(..., ge=0, le=5000)  # 0 = sensor de CO2 no disponible
+    presion: Optional[float] = Field(default=None, ge=0, le=2000)  # hPa
 
 
 class IngestResponse(BaseModel):
@@ -154,7 +156,7 @@ class IngestResponse(BaseModel):
 class ChatRequest(BaseModel):
     """Request para el chatbot de IA."""
     message: str = Field(..., min_length=1, description="Pregunta del usuario")
-    silo_id: str = Field(default="SILO_001", description="ID del silo para contexto")
+    silo_id: Optional[str] = Field(default=None, description="ID del silo para contexto (opcional)")
     session_id: str = Field(default="default", description="ID de sesión para mantener conversación")
 
 
@@ -179,6 +181,7 @@ class SiloOverviewItem(BaseModel):
     temperature: float
     humidity: float
     co2: float
+    pressure: Optional[float] = None
     risk_score: int
     risk_level: str
     last_update: str
@@ -199,6 +202,7 @@ class SiloHistoryItem(BaseModel):
     temperature: float
     humidity: float
     co2: float
+    pressure: Optional[float] = None
 
 
 class SiloHistoryResponse(BaseModel):

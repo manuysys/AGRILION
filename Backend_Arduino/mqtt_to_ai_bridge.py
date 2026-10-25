@@ -132,6 +132,14 @@ def safe_float(v) -> float:
         return 0.0
 
 
+def safe_pressure(v) -> float:
+    """Normaliza presión a hPa (el firmware envía ×10)."""
+    p = safe_float(v)
+    if p > 2000:
+        p /= 10.0
+    return p
+
+
 # =========================
 # MQTT CALLBACK
 # =========================
@@ -150,6 +158,7 @@ def on_message(client, userdata, msg):
         co2 = safe_float(data.get("co2", data.get("CO2", 0)))
         humidity = safe_float(data.get("humedad", data.get("humidity", data.get("hum", 0))))
         temperature = safe_float(data.get("temperatura", data.get("temperature", data.get("temp", 0))))
+        pressure = safe_pressure(data.get("presion", data.get("pressure", 0)))
 
         # Mapear device a silo
         silo_id = load_device_mapping(device_id)
@@ -160,12 +169,13 @@ def on_message(client, userdata, msg):
             "temperature": temperature,
             "humidity": humidity,
             "co2": co2,
+            "presion": pressure,
             "timestamp": datetime.now().isoformat(),
         }
 
         logger.info(
             f"📨 {device_id} → {silo_id} | "
-            f"T:{temperature}°C H:{humidity}% CO2:{co2}ppm"
+            f"T:{temperature}°C H:{humidity}% CO2:{co2}ppm P:{pressure}hPa"
         )
 
         # Enviar a la AI API (en thread separado para no bloquear MQTT)
@@ -194,7 +204,7 @@ def on_connect(client, userdata, flags, reason_code, properties):
         logger.error(f"❌ Error conexión HiveMQ: {reason_code}")
 
 
-def on_disconnect(client, userdata, reason_code, properties):
+def on_disconnect(client, userdata, disconnect_flags, reason_code, properties):
     logger.warning(f"⚠️ Desconectado de HiveMQ (código: {reason_code})")
     logger.info("Intentando reconectar...")
 

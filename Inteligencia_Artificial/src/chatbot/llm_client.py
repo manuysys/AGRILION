@@ -60,8 +60,12 @@ class LLMConfig:
         "google/gemma-2-9b-it:free",
     ])
 
+    # Layer 3: Ollama local (sin API key)
+    ollama_model: str = ""
+    ollama_base_url: str = "http://localhost:11434"
+
     max_tokens: int = 600
-    temperature: float = 0.3
+    temperature: float = 0.1
     timeout: float = 15.0
 
     max_retries: int = 1
@@ -72,6 +76,8 @@ class LLMConfig:
         return cls(
             groq_api_key=os.getenv("GROQ_API_KEY", ""),
             openrouter_api_key=os.getenv("OPENROUTER_API_KEY", ""),
+            ollama_model=os.getenv("OLLAMA_MODEL", ""),
+            ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
         )
 
 
@@ -297,9 +303,27 @@ class FallbackLLMClient(BaseLLMClient):
         else:
             logger.info("[Fallback] OpenRouter skipped (no OPENROUTER_API_KEY)")
 
-        # ── LAYER 3: Rule Engine (emergencia) ──
+        # ── LAYER 3: Ollama local (sin API key) ──
+        if self.config.ollama_model:
+            try:
+                from .local_model import LocalLLMClient
+
+                local = LocalLLMClient(
+                    model=self.config.ollama_model,
+                    base_url=self.config.ollama_base_url,
+                )
+                result = local.complete(messages)
+                if result:
+                    logger.info("[Fallback] Layer 3 (Ollama) used")
+                    return result
+            except Exception as e:
+                logger.warning(f"[Fallback] Ollama failed: {e}")
+        else:
+            logger.info("[Fallback] Ollama skipped (no OLLAMA_MODEL)")
+
+        # ── LAYER 4: Rule Engine (emergencia) ──
         if self.rule_engine and context:
-            logger.info("[Fallback] Layer 3 (Rule Engine) used")
+            logger.info("[Fallback] Layer 4 (Rule Engine) used")
 
             from src.chatbot.rule_based_engine import RuleBasedEngine
 
@@ -325,6 +349,8 @@ def create_llm_client(config: Optional[LLMConfig] = None, rule_engine=None):
         providers.append("Groq")
     if cfg.openrouter_api_key:
         providers.append("OpenRouter")
+    if cfg.ollama_model:
+        providers.append(f"Ollama({cfg.ollama_model})")
     providers.append("RuleEngine")
 
     logger.info(f"LLM INIT → fallback chain: {' → '.join(providers)}")

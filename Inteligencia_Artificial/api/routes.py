@@ -17,6 +17,7 @@ from pathlib import Path
 import logging
 
 from fastapi import APIRouter, HTTPException
+from starlette.concurrency import run_in_threadpool
 
 from .schemas import (
     PredictionRequest,
@@ -371,6 +372,7 @@ async def ingest_sensor_reading(request: IngestRequest):
         temperature=request.temperature,
         humidity=request.humidity,
         co2=request.co2,
+        presion=request.presion,
     )
 
     if _ai_service is None:
@@ -429,10 +431,45 @@ async def chat(request: ChatRequest):
     if _chatbot is None:
         raise HTTPException(status_code=503, detail="Chatbot not initialized")
 
-    result = _chatbot.chat(
-        message=request.message,
-        silo_id=request.silo_id,
-        session_id=request.session_id,
+    # Si el usuario no eligió un silo, usar el de mayor riesgo como contexto.
+    overview = []
+    if _influx_repo is not None:
+        try:
+            overview = _influx_repo.get_silo_overview()
+        except Exception as e:
+            logger.warning(f"No se pudo obtener overview para el chat: {e}")
+
+    silo_id = request.silo_id
+    if not silo_id and overview:
+        # Si el mensaje menciona un silo concreto, usarlo.
+        text = (request.message or "").lower()
+        for silo in overview:
+            if str(silo.get("silo_id", "")).lower() in text:
+                silo_id = silo["silo_id"]
+                break
+        if not silo_id:
+            top = max(overview, key=lambda s: s.get("risk_score", 0))
+            silo_id = top["silo_id"]
+
+    # Preguntas globales ("¿qué silos están en riesgo?") se responden con
+    # el estado real de todos los silos, no con un silo inventado.
+    if _is_global_chat_query(request.message) and overview:
+        return ChatResponse(
+            response=_format_global_chat_response(overview),
+            session_id=request.session_id or "default",
+            latency_ms=0.0,
+            context_used={"silos": overview},
+            from_cache=False,
+        )
+
+    # El chatbot es síncrono y puede tardar varios segundos (LLM local).
+    # Se ejecuta en un threadpool para no bloquear el event loop de FastAPI
+    # mientras el dashboard pide overview/history en paralelo.
+    result = await run_in_threadpool(
+        _chatbot.chat,
+        request.message,
+        silo_id,
+        request.session_id,
     )
     return ChatResponse(**result.to_dict())
 
@@ -494,6 +531,7 @@ async def get_silos_overview():
             temperature=float(s["temperature"]),
             humidity=float(s["humidity"]),
             co2=float(s["co2"]),
+            pressure=float(s["pressure"]) if s.get("pressure") is not None else None,
             risk_score=int(s["risk_score"]),
             risk_level=s["risk_level"],
             last_update=s["last_update"],
@@ -541,6 +579,7 @@ async def get_silo_history(silo_id: str, hours: int = 24):
             temperature=float(h["temperature"]),
             humidity=float(h["humidity"]),
             co2=float(h["co2"]),
+            pressure=float(h["pressure"]) if h.get("pressure") is not None else None,
         )
         for h in raw
     ]
@@ -551,6 +590,82 @@ async def get_silo_history(silo_id: str, hours: int = 24):
         hours=hours,
         total_points=len(history),
     )
+
+
+@router.get("/silos/{silo_id}/prediction", tags=["Datos"])
+async def get_silo_prediction(silo_id: str):
+    """
+    Predicción LSTM + anomalías + riesgo para un silo, usando el histórico
+    real de InfluxDB sin volver a escribir la lectura.
+    """
+    if _model is None or _preprocessor is None or _predictor is None:
+        raise HTTPException(status_code=503, detail="Modelo LSTM no disponible")
+    if _influx_repo is None:
+        raise HTTPException(status_code=503, detail="InfluxDB no disponible")
+
+    seq_len = LSTM_CONFIG["sequence_length"]
+    df = _influx_repo.get_recent_readings(silo_id, n=seq_len + 10)
+    sensor_cols = [c for c in SENSOR_COLUMNS if c in df.columns]
+
+    if len(df) < seq_len:
+        return {
+            "silo_id": silo_id,
+            "status": "insufficient_data",
+            "readings": int(len(df)),
+            "required": seq_len,
+            "predictions": [],
+            "anomalies": {},
+            "risk": None,
+            "model": "LSTM",
+        }
+
+    normalized = _preprocessor.normalize(df[sensor_cols], fit=False)
+    last_seq = normalized[-seq_len:]
+    preds = _predictor.predict_multistep(last_seq, steps=6, return_original_scale=True)
+
+    predictions = []
+    last_ts = df.index[-1]
+    for i, pred in enumerate(preds):
+        predictions.append({
+            "step": i + 1,
+            "timestamp": (last_ts + pd.Timedelta("1h") * (i + 1)).isoformat(),
+            "temperature": round(float(pred[0]), 2),
+            "humidity": round(float(pred[1]), 2) if len(pred) > 1 else None,
+            "co2": round(float(pred[2]), 2) if len(pred) > 2 else None,
+        })
+
+    last_vals = {c: float(df[c].iloc[-1]) for c in sensor_cols}
+    risk = _risk_engine.get_risk_factors(last_vals)
+
+    anomalies = {}
+    if len(df) >= 12:
+        try:
+            anom_df = _anomaly_detector.detect_all(df, sensor_cols)
+            last = anom_df.iloc[-1]
+            anomalies = {
+                "is_anomaly": bool(last.get("is_anomaly", False)),
+                "affected_sensors": [
+                    c for c in sensor_cols
+                    if last.get(f"{c}_anomaly_consensus", False)
+                ],
+            }
+        except Exception as e:
+            logger.warning(f"Anomaly detection skipped en /prediction: {e}")
+
+    return {
+        "silo_id": silo_id,
+        "status": "ok",
+        "readings": int(len(df)),
+        "required": seq_len,
+        "predictions": predictions,
+        "anomalies": anomalies,
+        "risk": {
+            "score": risk["total_score"],
+            "level": risk["level"],
+            "factors": risk["factors"],
+        },
+        "model": "LSTM",
+    }
 
 
 @router.get("/silos/{silo_id}/current", tags=["Datos"])
@@ -572,6 +687,7 @@ async def get_silo_current(silo_id: str):
                 "temperature": round(float(last.get("temperature", 0)), 1),
                 "humidity": round(float(last.get("humidity", 0)), 1),
                 "co2": round(float(last.get("co2", 0)), 1),
+                "pressure": round(float(last.get("pressure", 0)), 1) if last.get("pressure") is not None else None,
                 "risk_score": 0,
                 "risk_level": "NORMAL",
                 "last_update": str(df.index[-1]),
@@ -762,6 +878,61 @@ async def acknowledge_alert(uid: str, alert_id: str):
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
+
+
+def _is_global_chat_query(message: str) -> bool:
+    """Detecta preguntas que abarcan todos los silos, no uno en particular."""
+    text = (message or "").lower()
+    global_markers = [
+        "silos", "todos los silos", "todas las silobolsas", "general",
+        "resumen", "sistema", "campo", "planta",
+    ]
+    return any(marker in text for marker in global_markers)
+
+
+def _format_global_chat_response(overview: list[dict]) -> str:
+    """Respuesta determinística con el estado real de todos los silos."""
+    ordered = sorted(overview, key=lambda s: s.get("risk_score", 0), reverse=True)
+    critical = [s for s in ordered if s.get("risk_level") == "CRITICAL"]
+    warning = [s for s in ordered if s.get("risk_level") == "WARNING"]
+    normal = [s for s in ordered if s.get("risk_level") == "NORMAL"]
+
+    lines = [
+        f"Estado del sistema: {len(ordered)} silobolsa(s) monitoreada(s)",
+        f"• Críticas: {len(critical)} · En atención: {len(warning)} · Estables: {len(normal)}",
+        "",
+        "Detalle por silobolsa:",
+    ]
+
+    for silo in ordered:
+        level = silo.get("risk_level", "NORMAL")
+        emoji = {"CRITICAL": "🔴", "WARNING": "🟡"}.get(level, "🟢")
+        co2 = silo.get("co2", 0)
+        co2_text = "sin dato" if not co2 or float(co2) <= 0 else f"{float(co2):.0f} ppm"
+        lines.append(
+            f"• {silo.get('silo_id', '—')}: {level} {emoji} "
+            f"({silo.get('risk_score', 0)}/100) — "
+            f"T {float(silo.get('temperature', 0)):.1f} °C, "
+            f"H {float(silo.get('humidity', 0)):.1f} %, CO₂ {co2_text}"
+        )
+
+    if critical:
+        lines += [
+            "",
+            "Acción recomendada: inspección presencial inmediata en las silobolsas críticas.",
+        ]
+    elif warning:
+        lines += [
+            "",
+            "Acción recomendada: monitoreo reforzado en las próximas 24 horas.",
+        ]
+    else:
+        lines += [
+            "",
+            "Acción recomendada: continuar con el monitoreo periódico programado.",
+        ]
+
+    return "\n".join(lines)
 
 
 def _generate_mock_overview() -> list[dict]:

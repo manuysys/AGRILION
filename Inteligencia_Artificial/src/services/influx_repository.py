@@ -30,6 +30,7 @@ Requiere:
 """
 
 import logging
+import math
 from datetime import datetime, timedelta
 from typing import List, Optional
 
@@ -47,6 +48,50 @@ from src.services.ai_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Dispositivos/silos de prueba que no deben aparecer en el dashboard.
+# InfluxDB 3 Core no soporta DELETE, así que se excluyen en las consultas.
+EXCLUDED_DEVICES = {"test-device-001"}
+EXCLUDED_SILOS = {"SB-TEST01"}
+
+
+def _normalize_pressure(value) -> Optional[float]:
+    """Normaliza presión a hPa y descarta valores inválidos.
+
+    Algunos registros históricos quedaron con la presión en escala ×10
+    (p. ej. 10108) antes de corregir el pipeline. Se normalizan al leer.
+    """
+    try:
+        p = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(p) or p <= 0:
+        return None
+    if p > 2000:
+        p /= 10.0
+    return round(p, 1)
+
+
+def _excluded_devices_sql() -> str:
+    """Devuelve los device_id excluidos como lista SQL segura."""
+    if not EXCLUDED_DEVICES:
+        return "NULL"
+    return ", ".join("'" + d.replace("'", "''") + "'" for d in sorted(EXCLUDED_DEVICES))
+
+
+def _iso_utc(value) -> str:
+    """Convierte un timestamp de InfluxDB a ISO-8601 UTC (con Z).
+
+    InfluxDB devuelve los timestamps sin zona; el navegador los interpretaba
+    como hora local y el dashboard mostraba las lecturas 3 h adelantadas.
+    """
+    try:
+        ts = pd.Timestamp(value)
+        if ts.tzinfo is None:
+            ts = ts.tz_localize("UTC")
+        return ts.isoformat().replace("+00:00", "Z")
+    except Exception:
+        return str(value)
 
 
 class InfluxRepository(AbstractSiloRepository):
@@ -100,7 +145,7 @@ class InfluxRepository(AbstractSiloRepository):
         Usa SQL en lugar de Flux.
         """
         query = f"""
-        SELECT time, silo, temperatura, humedad, co2
+        SELECT time, silo, temperatura, humedad, co2, presion
         FROM "{self._measurement}"
         WHERE silo = '{silo_id}'
           AND time >= NOW() - INTERVAL '7 days'
@@ -120,13 +165,14 @@ class InfluxRepository(AbstractSiloRepository):
                 "time": "timestamp",
                 "temperatura": "temperature",
                 "humedad": "humidity",
+                "presion": "pressure",
             })
             df["silo_id"] = silo_id
             df["timestamp"] = pd.to_datetime(df["timestamp"])
             df = df.set_index("timestamp").sort_index()
 
             # Mantener solo las columnas relevantes
-            cols = ["temperature", "humidity", "co2", "silo_id"]
+            cols = ["temperature", "humidity", "co2", "pressure", "silo_id"]
             available_cols = [c for c in cols if c in df.columns]
             return df[available_cols]
 
@@ -160,17 +206,19 @@ class InfluxRepository(AbstractSiloRepository):
         Para cada silo, obtiene la última lectura y calcula score de riesgo.
         En InfluxDB 3 Core se usa SQL con DISTINCT ON (DataFusion).
         """
-        # Traemos las últimas lecturas de cada silo en la última hora
-        # Usamos una subquery para obtener el último timestamp por silo
+        # Traemos la última lectura conocida de cada silo (hasta 7 días).
+        # Así el dashboard sigue mostrando el último dato aunque el sensor
+        # esté temporalmente offline, con su timestamp real.
         query = f"""
-        SELECT s.time, s.silo, s.grano, s.device, s.temperatura, s.humedad, s.co2, s.score
+        SELECT s.time, s.silo, s.grano, s.device, s.temperatura, s.humedad, s.co2, s.presion, s.score
         FROM "{self._measurement}" s
         INNER JOIN (
             SELECT silo, MAX(time) AS max_time
             FROM "{self._measurement}"
-            WHERE time >= NOW() - INTERVAL '1 hour'
+            WHERE time >= NOW() - INTERVAL '7 days'
             GROUP BY silo
         ) latest ON s.silo = latest.silo AND s.time = latest.max_time
+        WHERE s.device NOT IN ({_excluded_devices_sql()})
         ORDER BY s.silo
         """
 
@@ -184,22 +232,26 @@ class InfluxRepository(AbstractSiloRepository):
                 temp = float(row.get("temperatura", 0))
                 hum = float(row.get("humedad", 0))
                 co2 = float(row.get("co2", 0))
-                score_raw = row.get("score")
-                score = int(score_raw) if pd.notna(score_raw) else self._calculate_simple_risk(temp, hum, co2)
-
+                # Se usa el score simple (umbrales ambientales) para que el
+                # dashboard y el chatbot sean consistentes. El score guardado
+                # por el backend puede incluir delta_CO2/impacto y desviarse.
+                score = self._calculate_simple_risk(temp, hum, co2)
                 level = self._score_to_level(score)
 
                 grain = row.get("grano")
                 device = row.get("device")
+
+                pressure = _normalize_pressure(row.get("presion"))
 
                 silos.append({
                     "silo_id": str(silo_id),
                     "temperature": round(temp, 1),
                     "humidity": round(hum, 1),
                     "co2": round(co2, 1),
+                    "pressure": pressure,
                     "risk_score": score,
                     "risk_level": level,
-                    "last_update": str(row.get("time", "")),
+                    "last_update": _iso_utc(row.get("time", "")),
                     "grain_type": str(grain) if pd.notna(grain) else None,
                     "device_id": str(device) if pd.notna(device) else None,
                 })
@@ -215,19 +267,23 @@ class InfluxRepository(AbstractSiloRepository):
     ) -> List[dict]:
         """
         Devuelve el historial de un silo en las últimas N horas.
-        En InfluxDB 3 Core usa date_bin() para agrupar en ventanas de 15 minutos.
+        En InfluxDB 3 Core usa date_bin() para agrupar en ventanas de 1 minuto.
         """
+        if silo_id in EXCLUDED_SILOS:
+            return []
+
         query = f"""
         SELECT
-            date_bin('15 minutes', time, TIMESTAMP '1970-01-01 00:00:00') AS time,
+            date_bin('1 minute', time, TIMESTAMP '1970-01-01 00:00:00') AS time,
             AVG(temperatura) AS temperatura,
             AVG(humedad) AS humedad,
-            AVG(co2) AS co2
+            AVG(co2) AS co2,
+            AVG(presion) AS presion
         FROM "{self._measurement}"
         WHERE silo = '{silo_id}'
           AND time >= NOW() - INTERVAL '{hours} hours'
-        GROUP BY time
-        ORDER BY time
+        GROUP BY date_bin('1 minute', time, TIMESTAMP '1970-01-01 00:00:00')
+        ORDER BY 1
         """
 
         try:
@@ -237,10 +293,11 @@ class InfluxRepository(AbstractSiloRepository):
 
             for _, row in df.iterrows():
                 history.append({
-                    "timestamp": str(row.get("time", "")),
+                    "timestamp": _iso_utc(row.get("time", "")),
                     "temperature": round(float(row.get("temperatura", 0)), 1),
                     "humidity": round(float(row.get("humedad", 0)), 1),
                     "co2": round(float(row.get("co2", 0)), 1),
+                    "pressure": _normalize_pressure(row.get("presion")),
                 })
 
             return history
@@ -269,12 +326,12 @@ class InfluxRepository(AbstractSiloRepository):
         elif hum > 60:
             score += 5
 
-        if co2 > 1200:
+        if co2 > 1500:
             score += 30
-        elif co2 > 800:
-            score += 20
+        elif co2 > 1200:
+            score += 25
         elif co2 > 600:
-            score += 10
+            score += 15
 
         return min(score, 100)
 

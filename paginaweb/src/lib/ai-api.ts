@@ -17,6 +17,7 @@ export interface SiloOverview {
   temperature: number;
   humidity: number;
   co2: number;
+  pressure?: number | null;
   risk_score: number;
   risk_level: 'NORMAL' | 'WARNING' | 'CRITICAL';
   last_update: string;
@@ -29,6 +30,7 @@ export interface SiloHistoryPoint {
   temperature: number;
   humidity: number;
   co2: number;
+  pressure?: number | null;
 }
 
 export interface ChatRequest {

@@ -1,63 +1,57 @@
 import httpx
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
 
 class LocalLLMClient:
     """
-    Cliente local usando Ollama
-    Siempre responde (fallback final)
+    Cliente local usando Ollama.
+
+    Usa /api/chat (formato de mensajes) en lugar de /api/generate para que
+    los modelos instruct (qwen3, llama3, etc.) respeten el system prompt.
     """
 
-    def __init__(self, model: str = "llama3"):
-        self.base_url = "http://localhost:11434"
+    def __init__(self, model: str = "qwen3:8b", base_url: str = "http://localhost:11434"):
+        self.base_url = base_url.rstrip("/")
         self.model = model
-        self.timeout = 5.0
+        self.timeout = 120.0
 
     def complete(self, messages: list[dict], **kwargs) -> str:
         try:
-            prompt = self._messages_to_prompt(messages)
-
             payload = {
                 "model": self.model,
-                "prompt": prompt,
+                "messages": messages,
                 "stream": False,
+                "think": False,          # qwen3: evita el bloque de razonamiento
+                "keep_alive": "1h",      # mantiene el modelo cargado en memoria
+                "options": {
+                    "temperature": kwargs.get("temperature", 0.1),
+                    "num_predict": kwargs.get("max_tokens", 350),
+                },
             }
 
             with httpx.Client(timeout=self.timeout) as client:
-                r = client.post(f"{self.base_url}/api/generate", json=payload)
+                r = client.post(f"{self.base_url}/api/chat", json=payload)
 
                 if r.status_code != 200:
-                    return self._safe_fallback()
+                    logger.warning(f"[Ollama] HTTP {r.status_code}: {r.text[:200]}")
+                    return ""
 
                 data = r.json()
-                return data.get("response", "").strip() or self._safe_fallback()
+                content = (data.get("message") or {}).get("content", "").strip()
+                return self._clean(content)
 
         except Exception as e:
-            logger.debug(f"Ollama error: {e}")
-            return self._safe_fallback()
+            logger.warning(f"[Ollama] error: {e}")
+            return ""
 
-    def _messages_to_prompt(self, messages):
-        """Convierte mensajes estilo OpenAI a prompt simple"""
-        parts = []
-
-        for m in messages:
-            role = m["role"]
-            content = m["content"]
-
-            if role == "system":
-                parts.append(f"[SYSTEM]\n{content}")
-            elif role == "user":
-                parts.append(f"[USER]\n{content}")
-            elif role == "assistant":
-                parts.append(f"[ASSISTANT]\n{content}")
-
-        parts.append("[ASSISTANT]\n")
-        return "\n\n".join(parts)
-
-    def _safe_fallback(self):
-        return (
-            "⚠️ El sistema está en modo offline. "
-            "No se pudo generar una respuesta completa, pero los datos siguen disponibles."
-        )
+    @staticmethod
+    def _clean(text: str) -> str:
+        """Quita bloques de razonamiento de modelos tipo qwen3."""
+        if not text:
+            return ""
+        text = re.sub(r"<think(?:ing)?>.*?</think(?:ing)?>", "", text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r"^\s*Thinking\.\.\..*?\n\n", "", text, flags=re.DOTALL)
+        return text.strip()

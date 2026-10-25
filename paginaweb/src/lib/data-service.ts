@@ -66,6 +66,7 @@ function overviewToSiloBag(o: SiloOverview): SiloBag {
       temperature: o.temperature,
       humidity: o.humidity,
       co2: o.co2,
+      pressure: o.pressure ?? null,
     },
     sensor: {
       connection: 'online',
@@ -185,6 +186,7 @@ export async function fetchSiloDetail(id: string): Promise<SiloBag | null> {
         temperature: h.temperature,
         humidity: h.humidity,
         co2: h.co2,
+        pressure: h.pressure ?? null,
       }));
     }
 

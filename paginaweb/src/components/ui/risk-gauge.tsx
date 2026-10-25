@@ -87,7 +87,7 @@ export default function RiskGauge({
           fill="none"
           stroke="var(--state-ok)"
           strokeWidth={cfg.strokeWidth}
-          strokeLinecap="round"
+          strokeLinecap="butt"
           strokeDasharray={`${normalPct * circumference} ${circumference}`}
           opacity={0.15}
         />

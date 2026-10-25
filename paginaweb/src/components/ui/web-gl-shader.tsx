@@ -10,9 +10,14 @@ interface ShaderUniforms {
   xScale: { value: number }
   yScale: { value: number }
   distortion: { value: number }
+  waveTint: { value: number[] }
 }
 
-export function WebGLShader() {
+interface WebGLShaderProps {
+  tone?: 'ok' | 'warn' | 'critical';
+}
+
+export function WebGLShader({ tone = 'ok' }: WebGLShaderProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<{
     scene: THREE.Scene | null
@@ -50,6 +55,7 @@ export function WebGLShader() {
       uniform float xScale;
       uniform float yScale;
       uniform float distortion;
+      uniform vec3 waveTint;
 
       void main() {
         vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
@@ -60,10 +66,10 @@ export function WebGLShader() {
         float gx = p.x;
         float bx = p.x * (1.0 - d);
 
-        // Render waves with green/emerald theme
-        float r = 0.01 / abs(p.y + sin((rx + time) * xScale) * yScale);
-        float g = 0.06 / abs(p.y + sin((gx + time) * xScale) * yScale);
-        float b = 0.02 / abs(p.y + sin((bx + time) * xScale) * yScale);
+        // Render waves with a state-dependent tint
+        float r = waveTint.r / abs(p.y + sin((rx + time) * xScale) * yScale);
+        float g = waveTint.g / abs(p.y + sin((gx + time) * xScale) * yScale);
+        float b = waveTint.b / abs(p.y + sin((bx + time) * xScale) * yScale);
         
         // Add subtle background grid noise
         float grid = sin(p.x * 50.0) * sin(p.y * 50.0);
@@ -80,9 +86,17 @@ export function WebGLShader() {
       refs.scene = new THREE.Scene()
       refs.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
       refs.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-      refs.renderer.setClearColor(new THREE.Color(0x020804), 1.0) // Deep forest black background
+      const clearColor = tone === 'critical' ? 0x0a0202 : tone === 'warn' ? 0x0a0602 : 0x020804
+      refs.renderer.setClearColor(new THREE.Color(clearColor), 1.0)
 
       refs.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, -1)
+
+      const tint =
+        tone === 'critical'
+          ? [0.1, 0.012, 0.012]
+          : tone === 'warn'
+            ? [0.085, 0.045, 0.006]
+            : [0.01, 0.06, 0.02]
 
       const uniforms: ShaderUniforms = {
         resolution: { value: [window.innerWidth, window.innerHeight] },
@@ -90,6 +104,7 @@ export function WebGLShader() {
         xScale: { value: 2.2 },
         yScale: { value: 0.35 },
         distortion: { value: 0.08 },
+        waveTint: { value: tint },
       }
       refs.uniforms = uniforms
 
@@ -151,7 +166,7 @@ export function WebGLShader() {
       }
       refs.renderer?.dispose()
     }
-  }, [])
+  }, [tone])
 
   return (
     <canvas

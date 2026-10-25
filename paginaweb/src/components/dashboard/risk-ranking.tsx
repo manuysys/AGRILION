@@ -80,7 +80,7 @@ export default function RiskRanking({ silos }: RiskRankingProps) {
       </div>
 
       {/* Silobags list with animations */}
-      <motion.div layout className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <motion.div layout className={`grid grid-cols-1 gap-4 ${filteredSilos.length > 1 ? 'md:grid-cols-2' : ''}`}>
         <AnimatePresence mode="popLayout">
           {silos.length === 0 ? (
             <motion.div

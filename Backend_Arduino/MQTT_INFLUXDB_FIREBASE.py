@@ -93,12 +93,14 @@ influx = InfluxDBClient3(
 # =========================
 # CONFIG POR GRANO
 # =========================
+# El SHT30 mide humedad RELATIVA AMBIENTE, no humedad del grano.
+# Los umbrales de humedad deben ser ambientales (%), no de grano.
 CONFIG_GRANOS = {
-    "maiz": {"hum_max": 14, "temp_max": 25},
-    "soja": {"hum_max": 13, "temp_max": 25},
-    "trigo": {"hum_max": 14, "temp_max": 25},
-    "girasol": {"hum_max": 10, "temp_max": 20},
-    "cebada": {"hum_max": 14, "temp_max": 25},
+    "maiz": {"hum_max": 70, "temp_max": 30},
+    "soja": {"hum_max": 70, "temp_max": 30},
+    "trigo": {"hum_max": 70, "temp_max": 30},
+    "girasol": {"hum_max": 65, "temp_max": 28},
+    "cebada": {"hum_max": 70, "temp_max": 30},
 }
 
 # =========================
@@ -109,6 +111,18 @@ def safe_float(v):
         return float(v)
     except:
         return 0.0
+
+
+def safe_pressure(v):
+    """Normaliza la presión a hPa.
+
+    El firmware envía presión ×10 (p. ej. 10108) y algunos formatters de TTN
+    no aplican la división. Si el valor es > 2000, se asume escala ×10.
+    """
+    p = safe_float(v)
+    if p > 2000:
+        p /= 10.0
+    return p
 
 # =========================
 # HISTORIAL CO2 (clave para detección de fermentación)
@@ -144,10 +158,13 @@ def evaluar_riesgo(data, config):
     score = 0
     evento = None
 
-    # CO2 (síntoma principal)
+    # CO2 (síntoma principal). Referencias: 600 ppm inicio de actividad,
+    # 1200-1500 ppm problema serio, >1500 ppm acción agresiva.
     if co2 > 1500:
         score += 30
-    elif co2 > 800:
+    elif co2 > 1200:
+        score += 25
+    elif co2 > 600:
         score += 15
 
     # 🔥 tendencia (más importante)
@@ -270,6 +287,7 @@ def on_hive_message(client, userdata, msg):
         co2 = safe_float(data.get("co2"))
         hum = safe_float(data.get("humedad") or data.get("humidity"))
         temp = safe_float(data.get("temperatura") or data.get("temperature"))
+        pres = safe_pressure(data.get("presion") or data.get("pressure"))
         acc = safe_float(data.get("aceleracion") or data.get("acceleration"))
 
         impacto = acc > 5
@@ -295,6 +313,7 @@ def on_hive_message(client, userdata, msg):
             .field("co2", co2)
             .field("humedad", hum)
             .field("temperatura", temp)
+            .field("presion", pres)
             .field("aceleracion", acc)
             .field("delta_co2", delta)
             .field("score", score)
@@ -320,7 +339,7 @@ def on_hive_message(client, userdata, msg):
         print(f"\n📥 {device_id} | {tipo_grano}")
         print(f"Estado: {estado} | Score: {score}")
         print(f"CO2:{co2} Δ:{round(delta,2)}")
-        print(f"Temp:{temp} Hum:{hum}")
+        print(f"Temp:{temp} Hum:{hum} Pres:{pres}")
         print(f"Evento: {evento}")
 
     except Exception as e:

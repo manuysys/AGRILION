@@ -56,9 +56,9 @@ AGRO_THRESHOLDS = {
     },
     "co2": {
         "baseline": 400.0,    # CO2 ambiental normal
-        "warning": 600.0,     # Actividad biológica detectada
-        "critical": 800.0,    # Fermentación activa
-        "severe": 1200.0,     # Situación crítica
+        "warning": 600.0,     # Inicio de actividad biológica
+        "critical": 1200.0,   # Problema serio (moho/insectos)
+        "severe": 1500.0,     # Acción agresiva / deterioro avanzado
     },
 }
 

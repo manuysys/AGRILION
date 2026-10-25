@@ -25,6 +25,7 @@ class SensorReading:
     temperature: float
     humidity: float
     co2: float
+    presion: Optional[float] = None
 
 
 @dataclass

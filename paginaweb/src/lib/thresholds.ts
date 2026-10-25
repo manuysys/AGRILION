@@ -8,15 +8,19 @@ export const THRESHOLDS = {
     unit: '°C',
   },
   humidity: {
-    normal: { min: 8, max: 14 },
-    warning: { min: 14, max: 17 },
-    critical: { min: 17, max: 30 },
+    // El SHT30 mide humedad RELATIVA AMBIENTE (no humedad del grano).
+    // Rangos de confort/riesgo para el aire del entorno del silo.
+    normal: { min: 30, max: 70 },
+    warning: { min: 70, max: 80 },
+    critical: { min: 80, max: 100 },
     unit: '%',
   },
   co2: {
+    // Referencias: aire exterior ~400-500 ppm; 600 ppm = inicio de actividad
+    // biológica; 1200-1500 ppm = problema serio; >1500 ppm = acción agresiva.
     normal: { min: 300, max: 600 },
-    warning: { min: 600, max: 800 },
-    critical: { min: 800, max: 2000 },
+    warning: { min: 600, max: 1200 },
+    critical: { min: 1200, max: 2000 },
     unit: 'ppm',
   },
   riskScore: {

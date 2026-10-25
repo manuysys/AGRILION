@@ -63,3 +63,7 @@ __pycache__/
 # Tokens y skills IA
 INFLUXDB_TOKEN
 .agents/
+
+# Playwright / capturas de auditoría
+.playwright-mcp/
+alerts_fix*.png

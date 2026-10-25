@@ -25,6 +25,17 @@ class SiloState:
             self.alerts = []
 
 
+def _format_co2(value) -> str:
+    """El SCD4x puede no estar disponible: 0 significa 'sin dato', no 0 ppm."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return "sin dato"
+    if v <= 0:
+        return "sin dato"
+    return f"{v:.0f} ppm"
+
+
 class RuleBasedEngine:
     """
     Deterministic rule engine for agricultural silo monitoring.
@@ -38,7 +49,7 @@ class RuleBasedEngine:
     TEMP_CRITICAL = 35.0
     HUM_HIGH = 70.0
     HUM_CRITICAL = 80.0
-    CO2_HIGH = 700.0
+    CO2_HIGH = 600.0
     CO2_CRITICAL = 1200.0
     SCORE_WARNING = 40
     SCORE_HIGH = 60
@@ -57,6 +68,9 @@ class RuleBasedEngine:
             Formatted Spanish response string
         """
         try:
+            conversational = self._conversational_reply(user_message)
+            if conversational:
+                return conversational
             return self._generate(state, user_message)
         except Exception:
             # Absolute last resort — should never reach this
@@ -65,9 +79,46 @@ class RuleBasedEngine:
                 f"Silo: {state.silo_id}\n\n"
                 f"Temperatura: {state.temperature}°C | "
                 f"Humedad: {state.humidity}% | "
-                f"CO₂: {state.co2} ppm\n\n"
+                f"CO₂: {_format_co2(state.co2)}\n\n"
                 "Monitoree el silo regularmente y consulte con un agrónomo."
             )
+
+    def _conversational_reply(self, message: str) -> Optional[str]:
+        """Responde saludos y charla básica sin volcar el estado del silo."""
+        text = (message or "").strip().lower()
+
+        greetings = (
+            "hola", "hoñla", "holaa", "buenas", "buen dia", "buen día",
+            "buenos dias", "buenos días", "hey", "que tal", "qué tal",
+        )
+        if any(g in text for g in greetings):
+            return (
+                "¡Hola! Soy el asistente de Agrilion. Puedo contarte el estado "
+                "de los silobolsas, explicarte una alerta, darte recomendaciones "
+                "o resumir el sistema. ¿Qué querés saber?"
+            )
+
+        if any(g in text for g in ("gracias", "muchas gracias", "ok", "dale", "perfecto", "genial")):
+            return (
+                "¡De nada! Si querés, puedo revisar el estado de los silos, "
+                "explicarte una alerta o mostrarte las predicciones del LSTM."
+            )
+
+        if any(g in text for g in (
+            "quien sos", "quién sos", "que podes hacer", "qué podés hacer",
+            "para que servis", "para qué servís", "ayuda", "ayudame", "ayúdame",
+        )):
+            return (
+                "Soy el asistente de Agrilion. Puedo responder sobre el estado "
+                "de los silobolsas, el riesgo, las alertas, la temperatura, la "
+                "humedad, el CO₂, la presión y las predicciones del modelo LSTM. "
+                "Probá con: «¿Qué silos están en riesgo?» o «¿Cómo está SB-E2E01?»."
+            )
+
+        if any(g in text for g in ("chau", "adios", "adiós", "hasta luego", "nos vemos")):
+            return "¡Hasta luego! Seguimos monitoreando los silobolsas."
+
+        return None
 
     def _generate(self, s: SiloState, message: str) -> str:
         problems, risks, actions, predictions = [], [], [], []
@@ -202,7 +253,7 @@ class RuleBasedEngine:
         lines = [
             f"Estado: {s.risk_level} {emoji}",
             f"Silo: {s.silo_id}",
-            f"Temperatura: {s.temperature:.1f}°C | Humedad: {s.humidity:.1f}% | CO₂: {s.co2:.0f} ppm",
+            f"Temperatura: {s.temperature:.1f}°C | Humedad: {s.humidity:.1f}% | CO₂: {_format_co2(s.co2)}",
             "",
             "Problema:",
             " ".join(problems),
@@ -227,7 +278,7 @@ class RuleBasedEngine:
         return (
             f"Estado: NORMAL 🟢\n"
             f"Silo: {s.silo_id}\n"
-            f"Temperatura: {s.temperature:.1f}°C | Humedad: {s.humidity:.1f}% | CO₂: {s.co2:.0f} ppm\n\n"
+            f"Temperatura: {s.temperature:.1f}°C | Humedad: {s.humidity:.1f}% | CO₂: {_format_co2(s.co2)}\n\n"
             "El silobolsa se encuentra dentro de los parámetros normales de almacenamiento.\n\n"
             "Acciones recomendadas:\n"
             "• Continuar con el monitoreo periódico programado.\n"
