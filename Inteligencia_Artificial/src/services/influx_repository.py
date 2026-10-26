@@ -209,8 +209,16 @@ class InfluxRepository(AbstractSiloRepository):
         # Traemos la última lectura conocida de cada silo (hasta 7 días).
         # Así el dashboard sigue mostrando el último dato aunque el sensor
         # esté temporalmente offline, con su timestamp real.
+        #
+        # Los nodos viejos no tienen campos GPS. Si InfluxDB todavía no
+        # conoce esas columnas, se reintenta con la consulta base.
+        base_select = (
+            "s.time, s.silo, s.grano, s.device, s.temperatura, s.humedad, "
+            "s.co2, s.presion, s.score"
+        )
         query = f"""
-        SELECT s.time, s.silo, s.grano, s.device, s.temperatura, s.humedad, s.co2, s.presion, s.score
+        SELECT {base_select}, s.latitude, s.longitude, s.gps_fix,
+               s.gps_has_fix, s.gps_satellites, s.gps_hdop, s.gps_age_min
         FROM "{self._measurement}" s
         INNER JOIN (
             SELECT silo, MAX(time) AS max_time
@@ -223,7 +231,27 @@ class InfluxRepository(AbstractSiloRepository):
         """
 
         try:
-            table = self._client.query(query)
+            try:
+                table = self._client.query(query)
+            except Exception as gps_error:
+                logger.warning(
+                    "Consulta GPS no disponible (%s); usando overview sin GPS",
+                    gps_error,
+                )
+                query = f"""
+                SELECT {base_select}
+                FROM "{self._measurement}" s
+                INNER JOIN (
+                    SELECT silo, MAX(time) AS max_time
+                    FROM "{self._measurement}"
+                    WHERE time >= NOW() - INTERVAL '7 days'
+                    GROUP BY silo
+                ) latest ON s.silo = latest.silo AND s.time = latest.max_time
+                WHERE s.device NOT IN ({_excluded_devices_sql()})
+                ORDER BY s.silo
+                """
+                table = self._client.query(query)
+
             df = table.to_pandas()
             silos = []
 
@@ -243,6 +271,25 @@ class InfluxRepository(AbstractSiloRepository):
 
                 pressure = _normalize_pressure(row.get("presion"))
 
+                def optional_float(key, decimals=7):
+                    value = row.get(key)
+                    if value is None or pd.isna(value):
+                        return None
+                    return round(float(value), decimals)
+
+                def optional_int(key):
+                    value = row.get(key)
+                    if value is None or pd.isna(value):
+                        return None
+                    return int(float(value))
+
+                has_fix = optional_int("gps_has_fix")
+                latitude = optional_float("latitude")
+                longitude = optional_float("longitude")
+                if not has_fix:
+                    latitude = None
+                    longitude = None
+
                 silos.append({
                     "silo_id": str(silo_id),
                     "temperature": round(temp, 1),
@@ -254,6 +301,13 @@ class InfluxRepository(AbstractSiloRepository):
                     "last_update": _iso_utc(row.get("time", "")),
                     "grain_type": str(grain) if pd.notna(grain) else None,
                     "device_id": str(device) if pd.notna(device) else None,
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "gps_fix": bool(optional_int("gps_fix") or 0) if "gps_fix" in df.columns else None,
+                    "gps_has_fix": bool(has_fix) if has_fix is not None else None,
+                    "gps_satellites": optional_int("gps_satellites"),
+                    "gps_hdop": optional_float("gps_hdop", 1),
+                    "gps_age_min": optional_int("gps_age_min"),
                 })
 
             return silos

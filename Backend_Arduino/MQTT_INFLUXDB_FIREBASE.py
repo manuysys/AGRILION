@@ -255,6 +255,42 @@ def actualizar_silo_firebase(owner_uid: str, silo_id: str, estado, alerta, score
     except Exception as e:
         print(f"⚠️ Error actualizando silo {silo_id}: {e}")
 
+
+def actualizar_ubicacion_firebase(
+    owner_uid: str,
+    silo_id: str,
+    latitude,
+    longitude,
+    gps_fix: bool,
+    gps_has_fix: bool,
+    satellites: int,
+    hdop: float,
+    gps_age_min: int,
+):
+    """Guarda la última posición GPS del silo, sin esperar el cooldown de alertas."""
+    if not FIREBASE_OK:
+        return
+    if not owner_uid or not silo_id or silo_id == "unknown":
+        return
+    try:
+        updates = {
+            "gps_fix": bool(gps_fix),
+            "gps_has_fix": bool(gps_has_fix),
+            "gps_satellites": int(satellites),
+            "gps_hdop": float(hdop),
+            "gps_age_min": int(gps_age_min),
+            "gps_updated_at": firestore.SERVER_TIMESTAMP,
+        }
+        if gps_has_fix and latitude is not None and longitude is not None:
+            updates["latitude"] = float(latitude)
+            updates["longitude"] = float(longitude)
+
+        db.collection("users").document(owner_uid).collection("silos").document(silo_id).set(
+            updates, merge=True
+        )
+    except Exception as e:
+        print(f"⚠️ Error actualizando GPS del silo {silo_id}: {e}")
+
 # =========================
 # HIVE CLIENT
 # =========================
@@ -290,6 +326,16 @@ def on_hive_message(client, userdata, msg):
         pres = safe_pressure(data.get("presion") or data.get("pressure"))
         acc = safe_float(data.get("aceleracion") or data.get("acceleration"))
 
+        latitude = data.get("latitude")
+        longitude = data.get("longitude")
+        latitude = float(latitude) if latitude is not None else None
+        longitude = float(longitude) if longitude is not None else None
+        gps_has_fix = bool(data.get("gps_has_fix", latitude is not None and longitude is not None))
+        gps_fix = bool(data.get("gps_fix", False))
+        gps_satellites = int(safe_float(data.get("gps_satellites")))
+        gps_hdop = safe_float(data.get("gps_hdop"))
+        gps_age_min = int(safe_float(data.get("gps_age_min")))
+
         impacto = acc > 5
 
         delta = calcular_delta(device_id, co2)
@@ -317,6 +363,15 @@ def on_hive_message(client, userdata, msg):
             .field("aceleracion", acc)
             .field("delta_co2", delta)
             .field("score", score)
+            .field("gps_fix", 1 if gps_fix else 0)
+            .field("gps_has_fix", 1 if gps_has_fix else 0)
+            .field("gps_satellites", gps_satellites)
+            .field("gps_hdop", gps_hdop)
+            .field("gps_age_min", gps_age_min)
+            # InfluxDB 3 necesita que la columna exista desde el primer punto.
+            # Si no hay fix se escribe 0; la API lo oculta con gps_has_fix=false.
+            .field("latitude", float(latitude) if latitude is not None else 0.0)
+            .field("longitude", float(longitude) if longitude is not None else 0.0)
         )
 
         influx.write(record=point)
@@ -327,7 +382,20 @@ def on_hive_message(client, userdata, msg):
         # a) Marcar el sensor como activo + actualizar last_seen
         update_sensor_status(device_id)
 
-        # b) Actualizar el estado del silo (con cooldown para no spamear)
+        # b) Actualizar la ubicación GPS (cada lectura, sin cooldown)
+        actualizar_ubicacion_firebase(
+            owner_uid,
+            silo_id,
+            latitude,
+            longitude,
+            gps_fix,
+            gps_has_fix,
+            gps_satellites,
+            gps_hdop,
+            gps_age_min,
+        )
+
+        # c) Actualizar el estado del silo (con cooldown para no spamear)
         if owner_uid and silo_id != "unknown" and puede_alertar(device_id, estado):
             actualizar_silo_firebase(
                 owner_uid, silo_id, estado, alerta, score, evento, delta
@@ -340,6 +408,7 @@ def on_hive_message(client, userdata, msg):
         print(f"Estado: {estado} | Score: {score}")
         print(f"CO2:{co2} Δ:{round(delta,2)}")
         print(f"Temp:{temp} Hum:{hum} Pres:{pres}")
+        print(f"GPS: fix={gps_fix} has_fix={gps_has_fix} lat={latitude} lon={longitude} sats={gps_satellites}")
         print(f"Evento: {evento}")
 
     except Exception as e:

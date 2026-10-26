@@ -44,6 +44,8 @@ object SilosDataManagerBaseDeDatos {
 
             val fromApi = overview.map { dto ->
                 val meta = metaById[dto.siloId]
+                val latitude = dto.latitude ?: meta?.double("latitude")
+                val longitude = dto.longitude ?: meta?.double("longitude")
                 SilobolsaBaseDeDatos(
                     id = dto.siloId,
                     nombre = meta?.string("name") ?: "Silobolsa ${dto.siloId}",
@@ -59,7 +61,14 @@ object SilosDataManagerBaseDeDatos {
                     presion = dto.pressure,
                     riskScore = dto.riskScore,
                     riskLevel = dto.riskLevel,
-                    deviceId = dto.deviceId
+                    deviceId = dto.deviceId,
+                    latitude = latitude,
+                    longitude = longitude,
+                    gpsFix = dto.gpsFix ?: meta?.bool("gps_fix") ?: false,
+                    gpsHasFix = dto.gpsHasFix ?: (latitude != null && longitude != null),
+                    gpsSatellites = dto.gpsSatellites ?: meta?.int("gps_satellites"),
+                    gpsHdop = dto.gpsHdop ?: meta?.double("gps_hdop"),
+                    gpsAgeMin = dto.gpsAgeMin ?: meta?.int("gps_age_min")
                 )
             }
 
@@ -69,6 +78,8 @@ object SilosDataManagerBaseDeDatos {
                 .filter { meta -> (meta["siloId"]?.toString().orEmpty()) !in apiIds }
                 .map { meta ->
                     val id = meta["siloId"]?.toString().orEmpty()
+                    val latitude = meta.double("latitude")
+                    val longitude = meta.double("longitude")
                     SilobolsaBaseDeDatos(
                         id = id,
                         nombre = meta.string("name") ?: "Silobolsa $id",
@@ -77,7 +88,14 @@ object SilosDataManagerBaseDeDatos {
                         tipoGrano = meta.string("grainType") ?: "Sin dato",
                         toneladas = meta.double("tons") ?: 0.0,
                         ubicacion = meta.string("location") ?: "Sin ubicación",
-                        diagnosticoSemanal = "Todavía no se recibieron lecturas de este silo."
+                        diagnosticoSemanal = "Todavía no se recibieron lecturas de este silo.",
+                        latitude = latitude,
+                        longitude = longitude,
+                        gpsFix = meta.bool("gps_fix") ?: false,
+                        gpsHasFix = latitude != null && longitude != null,
+                        gpsSatellites = meta.int("gps_satellites"),
+                        gpsHdop = meta.double("gps_hdop"),
+                        gpsAgeMin = meta.int("gps_age_min")
                     )
                 }
 
@@ -208,4 +226,10 @@ object SilosDataManagerBaseDeDatos {
 
     private fun Map<String, Any>.double(key: String): Double? =
         (this[key] as? Number)?.toDouble()
+
+    private fun Map<String, Any>.int(key: String): Int? =
+        (this[key] as? Number)?.toInt()
+
+    private fun Map<String, Any>.bool(key: String): Boolean? =
+        this[key] as? Boolean
 }

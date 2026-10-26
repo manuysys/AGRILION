@@ -8,6 +8,7 @@ Sketch LoRaWAN OTAA del nodo CubeCell-GPS con sensores:
 | BME280 | presión | 0x76 / 0x77 |
 | SCD41  | CO2 | 0x62 |
 | ADXL345 | impacto / aceleración | 0x53 |
+| GPS Air530Z | posición | UART1 9600, enable GPIO14 |
 
 ## Flasheo (IMPORTANTE)
 
@@ -51,6 +52,44 @@ Secuencia exacta por frame (`prepareTxFrame`):
 
 Los valores de diagnóstico se imprimen por serie:
 `[TEST-VENTANA]` (al arrancar) y `[SHT30]` / `[BME280]` (por frame).
+
+## GPS Air530Z
+
+El GPS usa **UART1 a 9600** y se enciende con **GPIO14 en LOW**. En la prueba de
+banco siguió entregando NMEA con `Vext` apagado, así que se mantiene encendido
+de forma continua sin alimentar los sensores durante el TX. El consumo todavía
+no está optimizado; queda para una etapa posterior.
+
+Cada frame, antes de los sensores, se ejecuta `leerGPS()` durante 1,5 s y se
+conserva la última posición válida. El log por serie es:
+
+```text
+[GPS] fix=0 lat=0.000000 lon=0.000000 sats=0 hdop=25.50 age=0
+```
+
+Bajo techo no hay fix (`sats=0`, HDOP 25.5): hace falta vista al cielo o antena
+externa. La radio y el join siguen funcionando con el GPS encendido.
+
+### Payload v2 (23 bytes)
+
+| Bytes | Campo | Escala |
+|-------|-------|--------|
+| 0–1 | Temperatura | int16 / 100 |
+| 2–3 | Humedad | int16 / 100 |
+| 4–5 | Presión | int16 / 10 |
+| 6–7 | CO₂ | uint16 ppm |
+| 8 | Impacto | 0/1 |
+| 9–10 | Aceleración | uint16 / 10 |
+| 11 | Flags GPS | nibble alto = 2; bit0 = última posición; bit1 = fix actual |
+| 12 | Satélites | uint8 |
+| 13 | HDOP | uint8 / 10 |
+| 14–17 | Latitud | int32 / 1e7 |
+| 18–21 | Longitud | int32 / 1e7 |
+| 22 | Edad del último fix | minutos (máx. 255) |
+
+El decoder acepta también payloads v1 de 11 bytes. Actualizar el formatter de
+TTN con `Backend_Arduino/TTN_Payload_Formatter.js`; el bridge local
+`TTN_MQTT.py` ya decodifica v2 aunque la consola tenga el viejo.
 
 ## Watchdog de join (auto-recuperación)
 

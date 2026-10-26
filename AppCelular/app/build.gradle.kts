@@ -52,6 +52,9 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
 
+    // Mapa OpenStreetMap (sin API key)
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
+
     // Coroutines for background tasks
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 

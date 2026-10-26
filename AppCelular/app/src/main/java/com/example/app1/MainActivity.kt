@@ -400,7 +400,11 @@ fun AgrilionApp(user: FirebaseUser? = null) {
             }
         ) { padding ->
             NavHost(navController = navController, startDestination = "dashboard", modifier = Modifier.padding(padding)) {
-                composable("dashboard") { DashboardScreen() }
+                composable("dashboard") {
+                    DashboardScreen(
+                        onSiloClick = { id -> navController.navigate("silo_detail/$id") }
+                    )
+                }
                 composable("profile") { ProfileScreen() }
                 composable("chatbot") { ChatbotScreen() }
                 composable("chat_history") { ChatHistoryScreen(onChatClick = { _ -> navController.navigate("chatbot") }) }

@@ -15,6 +15,8 @@ Estado de la app Android integrada al sistema real (Firebase + AI API + InfluxDB
 - Merge entre las lecturas de la API y los metadatos del usuario en Firestore
   (nombre, tipo de grano, ubicación y toneladas).
 - Dashboard con estados reales, dona de riesgo y conteo de silos por grano.
+- Mapa de silos con GPS real (osmdroid + OpenStreetMap) y navegación al detalle
+  al tocar un marcador.
 - Mis Silos con búsqueda, métricas reales, edición y eliminación en Firestore.
 - Detalle con temperatura, humedad, CO₂, presión, riesgo, histórico y predicción LSTM.
 - Chat contra el LLM local (`qwen2.5:14b`), con fallback local si la API no responde.
@@ -39,6 +41,26 @@ sin reiniciar la app. El botón **Probar conexión** llama a `/api/v1/health`.
 
 El manifiesto permite tráfico HTTP (`usesCleartextTraffic="true"`) para pruebas
 locales. Para producción conviene HTTPS y quitarlo.
+
+## Mapa GPS
+
+La tarjeta **MAPA DE SILOS** del Dashboard usa `SiloMapCard.kt` con
+`org.osmdroid:osmdroid-android:6.1.20`.
+
+- Tiles OpenStreetMap estándar con `TilesOverlay.INVERT_COLORS` para el tema
+  oscuro; no requiere API key.
+- User-Agent identificable exigido por OSM:
+  `AgrilionAndroid/1.0 (+https://github.com/manuysys/AGRILION)`.
+- Muestra marcadores solo para silos con `gpsHasFix=true` y coordenadas.
+- Al tocar un marcador navega a `silo_detail/{id}`.
+- Si todavía no hay fix, muestra un estado vacío con la explicación.
+- Los datos GPS llegan por `SiloOverviewDto` (`latitude`, `longitude`,
+  `gps_fix`, `gps_has_fix`, `gps_satellites`, `gps_hdop`, `gps_age_min`) y,
+  como respaldo, desde los metadatos del silo en Firestore.
+
+Prueba manual realizada: build `assembleDebug`, instalación en emulador, login
+de prueba, marcador visible sobre Buenos Aires y click al detalle. El usuario
+de prueba se eliminó después.
 
 ## Requisitos para probar
 
@@ -69,12 +91,15 @@ AppCelular/app/build/outputs/apk/debug/app-debug.apk
 
 1. Abrir la app y registrarse o iniciar sesión.
 2. Verificar que el dashboard muestre el silo real (`SB-E2E01` en el entorno E2E).
-3. Entrar a **Mis Silos** y abrir el detalle.
-4. Confirmar histórico de 24 h y predicción LSTM.
-5. Abrir el asistente y preguntar por el estado de un silo.
-6. Probar **Configuración → Conexión API → Probar conexión**.
-7. Editar nombre/teléfono en Perfil y verificar el cambio en Firestore.
-8. Cerrar sesión.
+3. Bajar hasta **MAPA DE SILOS**: con GPS fijo debe aparecer el marcador; si no
+   hay fix, debe verse el estado vacío. Tocar el marcador y comprobar que abre
+   el detalle.
+4. Entrar a **Mis Silos** y abrir el detalle.
+5. Confirmar histórico de 24 h y predicción LSTM.
+6. Abrir el asistente y preguntar por el estado de un silo.
+7. Probar **Configuración → Conexión API → Probar conexión**.
+8. Editar nombre/teléfono en Perfil y verificar el cambio en Firestore.
+9. Cerrar sesión.
 
 ## Limitaciones conocidas
 
@@ -90,6 +115,9 @@ AppCelular/app/build/outputs/apk/debug/app-debug.apk
   en tiempo real.
 - No hay tests automatizados de Android. La verificación fue build + pruebas
   manuales en emulador.
+- La placa todavía no logró un fix GPS real bajo techo. El mapa y los marcadores
+  se probaron con un silo de prueba con coordenadas; falta validar la cadena
+  completa al aire libre.
 - La eliminación de cuenta desde la app se retiró porque requiere un flujo de
   reautenticación y borrado del perfil; queda pendiente para producción.
 
@@ -101,4 +129,5 @@ AppCelular/app/build/outputs/apk/debug/app-debug.apk
 - `data/AuthManager.kt`: Auth, perfil, silos y recuperación de contraseña.
 - `data/ChatApiServiceBaseDeDatos.kt`: chat y health.
 - `MainActivity.kt`: gate de sesión, polling y navegación.
+- `ui/screens/SiloMapCard.kt`: mapa osmdroid y marcadores GPS.
 - `ui/screens/*`: dashboard, silos, detalle, chat, perfil y configuración.

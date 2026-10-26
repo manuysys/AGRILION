@@ -54,6 +54,19 @@ export interface AIInterpretation {
 }
 
 // ── Silo Bag ──
+export interface SiloCoordinates {
+  latitude: number;
+  longitude: number;
+}
+
+export interface SiloGpsStatus {
+  hasFix: boolean;
+  currentFix: boolean;
+  satellites: number | null;
+  hdop: number | null;
+  ageMin: number | null;
+}
+
 export interface SiloBag {
   id: string;
   name: string;
@@ -69,6 +82,8 @@ export interface SiloBag {
   alerts: Alert[];
   storedSince: string | null; // ISO date (null = sin dato)
   estimatedTons: number | null;
+  coordinates?: SiloCoordinates | null;
+  gps?: SiloGpsStatus | null;
 }
 
 // ── Dashboard Stats ──

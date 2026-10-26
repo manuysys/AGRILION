@@ -20,6 +20,13 @@ data class SilobolsaBaseDeDatos(
     val riskScore: Int = 0,
     val riskLevel: String = "NORMAL",
     val deviceId: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val gpsFix: Boolean = false,
+    val gpsHasFix: Boolean = false,
+    val gpsSatellites: Int? = null,
+    val gpsHdop: Double? = null,
+    val gpsAgeMin: Int? = null,
     val history: List<SensorReadingBaseDeDatos> = emptyList(),
     val prediction: List<SensorReadingBaseDeDatos> = emptyList()
 )

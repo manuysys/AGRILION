@@ -20,6 +20,18 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Mapa GPS
+
+El dashboard incluye `src/components/dashboard/silo-map.tsx`:
+
+- Leaflet 1.9.4 con tiles OpenStreetMap y filtro CSS oscuro (sin API key).
+- Solo se muestra para usuarios autenticados; un invitado ve el aviso de login.
+- Marcadores para silos con `gps_has_fix=true`, popup y link al detalle.
+- Los datos llegan de `GET /api/v1/silos/overview`; `data-service.ts` los mapea
+  a `SiloBag.coordinates` y `SiloBag.gps`.
+
+La integración completa se documenta en `../docs/GPS_INTEGRACION.md`.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

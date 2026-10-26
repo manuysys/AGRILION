@@ -38,7 +38,7 @@ import com.example.app1.ui.theme.AgrilionTokens
 import java.util.Locale
 
 @Composable
-fun DashboardScreen() {
+fun DashboardScreen(onSiloClick: (String) -> Unit = {}) {
     val scrollState = rememberScrollState()
     
     val silos = SilosDataManagerBaseDeDatos.silosList
@@ -162,6 +162,15 @@ fun DashboardScreen() {
                     )
                 }
             }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        DashboardSection("MAPA DE SILOS") {
+            SiloMapCard(
+                silos = silos,
+                onSiloClick = onSiloClick
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))

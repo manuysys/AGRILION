@@ -5,6 +5,7 @@ import DashboardHeader from '@/components/layout/dashboard-header';
 import { fetchDashboardStats } from '@/lib/data-service';
 import { formatRelativeTime } from '@/lib/formatters';
 import PageTransition from '@/components/ui/page-transition';
+import 'leaflet/dist/leaflet.css';
 
 export const metadata: Metadata = {
   title: 'Dashboard | Agrilion+',

@@ -48,12 +48,26 @@ function capitalize(text: string): string {
 function overviewToSiloBag(o: SiloOverview): SiloBag {
   const state = riskLevelToState(o.risk_level);
   const now = new Date().toISOString();
+  const hasCoordinates = typeof o.latitude === 'number' && typeof o.longitude === 'number';
+  const coordinates = hasCoordinates
+    ? { latitude: o.latitude as number, longitude: o.longitude as number }
+    : null;
 
   return {
     id: o.silo_id,
     name: `Silobolsa ${o.silo_id.replace('SILO_', 'SB-')}`,
-    location: 'Sin ubicación',
+    location: coordinates
+      ? `${coordinates.latitude.toFixed(5)}, ${coordinates.longitude.toFixed(5)}`
+      : 'Sin ubicación',
     grainType: o.grain_type ? capitalize(o.grain_type) : 'Sin dato',
+    coordinates,
+    gps: {
+      hasFix: Boolean(o.gps_has_fix ?? hasCoordinates),
+      currentFix: Boolean(o.gps_fix),
+      satellites: o.gps_satellites ?? null,
+      hdop: o.gps_hdop ?? null,
+      ageMin: o.gps_age_min ?? null,
+    },
     state,
     riskScore: {
       value: o.risk_score,

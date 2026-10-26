@@ -23,6 +23,13 @@ export interface SiloOverview {
   last_update: string;
   grain_type?: string | null;
   device_id?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  gps_fix?: boolean | null;
+  gps_has_fix?: boolean | null;
+  gps_satellites?: number | null;
+  gps_hdop?: number | null;
+  gps_age_min?: number | null;
 }
 
 export interface SiloHistoryPoint {

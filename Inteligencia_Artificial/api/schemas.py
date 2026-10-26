@@ -187,6 +187,14 @@ class SiloOverviewItem(BaseModel):
     last_update: str
     grain_type: Optional[str] = None
     device_id: Optional[str] = None
+    # Metadatos GPS (no forman parte del modelo LSTM)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    gps_fix: Optional[bool] = None
+    gps_has_fix: Optional[bool] = None
+    gps_satellites: Optional[int] = None
+    gps_hdop: Optional[float] = None
+    gps_age_min: Optional[int] = None
 
 
 class SilosOverviewResponse(BaseModel):

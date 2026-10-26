@@ -2,6 +2,7 @@ import { fetchSilobags, fetchDashboardStats, fetchAlerts } from '@/lib/data-serv
 import { interpretSystem } from '@/lib/interpretation';
 import DashboardHero from '@/components/dashboard/dashboard-hero';
 import DashboardStats from '@/components/dashboard/dashboard-stats';
+import SiloMap from '@/components/dashboard/silo-map';
 import RiskRanking from '@/components/dashboard/risk-ranking';
 import RecentAlerts from '@/components/dashboard/recent-alerts';
 
@@ -28,6 +29,9 @@ export default async function DashboardPage() {
 
       {/* Quick Stats */}
       <DashboardStats stats={stats} />
+
+      {/* Mapa de ubicaciones GPS (solo para usuarios logueados) */}
+      <SiloMap silos={silos} />
 
       {/* Main content grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

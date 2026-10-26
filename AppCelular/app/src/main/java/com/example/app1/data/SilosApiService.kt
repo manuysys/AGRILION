@@ -27,7 +27,14 @@ data class SiloOverviewDto(
     @SerializedName("risk_level") val riskLevel: String = "NORMAL",
     @SerializedName("last_update") val lastUpdate: String = "",
     @SerializedName("grain_type") val grainType: String? = null,
-    @SerializedName("device_id") val deviceId: String? = null
+    @SerializedName("device_id") val deviceId: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    @SerializedName("gps_fix") val gpsFix: Boolean? = null,
+    @SerializedName("gps_has_fix") val gpsHasFix: Boolean? = null,
+    @SerializedName("gps_satellites") val gpsSatellites: Int? = null,
+    @SerializedName("gps_hdop") val gpsHdop: Double? = null,
+    @SerializedName("gps_age_min") val gpsAgeMin: Int? = null
 )
 
 data class SiloHistoryResponse(

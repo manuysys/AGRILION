@@ -6,6 +6,7 @@
 #include <Adafruit_SHT31.h>
 #include <SparkFun_SCD4x_Arduino_Library.h>
 #include <Adafruit_ADXL345_U.h>
+#include "GPS_Air530Z.h"
 
 // ================== LoRaWAN Credenciales ==================
 // devEui/appEui/appKey viven en secrets.h (IGNORADO por git).
@@ -38,6 +39,20 @@ SCD4x           scd41(SCD4x_SENSOR_SCD41);
 Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
 bool scd41_initialized = false;
 uint16_t last_co2 = 0;
+
+// GPS Air530Z integrado en la HTCC-AB02S. Usa UART1 y se controla con
+// GPIO14 (VGPS). En la prueba de banco quedó encendido de forma continua
+// aunque Vext esté apagado, así que no compite con el riel de los sensores.
+Air530ZClass GPS;
+bool     gpsCurrentFix   = false;
+bool     gpsLastFixValid = false;
+double   gpsLastLat      = 0.0;
+double   gpsLastLng      = 0.0;
+uint32_t gpsLastFixMs    = 0;
+uint8_t  gpsSats         = 0;
+float    gpsHdop         = 0.0;
+
+#define AGRILION_GPS_READ_MS 1500
 
 #define PIN_INTERRUPCION GPIO5
 
@@ -106,6 +121,38 @@ float leerAcelerometroInstantaneo()
   return abs(magnitud - 9.81);
 }
 
+// ================== GPS ==================
+// Lee NMEA durante una ventana corta. El GPS queda encendido entre frames
+// (GPIO14 LOW) para conservar el fix; más adelante se puede pasar a duty cycle.
+void leerGPS()
+{
+  uint32_t start = millis();
+  while (millis() - start < AGRILION_GPS_READ_MS) {
+    while (GPSSerial.available() > 0) {
+      GPS.encode(GPSSerial.read());
+    }
+  }
+
+  gpsCurrentFix = GPS.location.isValid() && GPS.location.age() < 5000;
+  if (gpsCurrentFix) {
+    gpsLastLat = GPS.location.lat();
+    gpsLastLng = GPS.location.lng();
+    gpsLastFixValid = true;
+    gpsLastFixMs = millis();
+  }
+
+  gpsSats = GPS.satellites.isValid() ? (uint8_t)GPS.satellites.value() : 0;
+  gpsHdop = GPS.hdop.isValid() ? GPS.hdop.hdop() : 0.0;
+
+  Serial.printf(
+    "[GPS] fix=%d lat=%.6f lon=%.6f sats=%u hdop=%.2f age=%lu\n",
+    gpsCurrentFix ? 1 : 0,
+    gpsLastLat, gpsLastLng,
+    (unsigned)gpsSats, gpsHdop,
+    (unsigned long)(gpsLastFixValid ? (millis() - gpsLastFixMs) / 1000 : 0)
+  );
+}
+
 // ================== INTERRUPCIÓN ==================
 void ISR_Movimiento()
 {
@@ -145,6 +192,11 @@ void prepareTxFrame(uint8_t port)
   pinMode(SDA, INPUT);
   pinMode(SCL, INPUT);
   digitalWrite(Vext, LOW);
+
+  // El GPS está alimentado por VGPS y no por Vext; se puede leer mientras
+  // los sensores siguen apagados. Mantener GPIO14 en LOW entre frames.
+  leerGPS();
+
 #if AGRILION_CO2
   delay(AGRILION_CO2_WARMUP_MS);
 #else
@@ -233,7 +285,7 @@ void prepareTxFrame(uint8_t port)
   int16_t h = isnan(hum)  ? 0 : (int16_t)(hum  * 100);
   int16_t p = isnan(pres) ? 0 : (int16_t)(pres * 10);  // conserva 1 decimal
 
-  appDataSize = 11;
+  appDataSize = 23;
   appData[0]  = highByte(t);
   appData[1]  = lowByte(t);
   appData[2]  = highByte(h);
@@ -246,6 +298,39 @@ void prepareTxFrame(uint8_t port)
   appData[9]  = highByte(aceleracionGuardada);
   appData[10] = lowByte(aceleracionGuardada);
 
+  // Bloque GPS (payload v2, 23 bytes):
+  // [11] flags: bit0 = última posición válida, bit1 = fix actual,
+  //             nibble alto = versión 2
+  // [12] satélites, [13] HDOP x10
+  // [14..17] latitud int32 x1e7, [18..21] longitud int32 x1e7
+  // [22] edad de la última posición en minutos (saturada a 255)
+  uint8_t gpsFlags = 0x20;
+  if (gpsLastFixValid) gpsFlags |= 0x01;
+  if (gpsCurrentFix)   gpsFlags |= 0x02;
+
+  uint32_t gpsAgeMin = 0;
+  if (gpsLastFixValid) {
+    gpsAgeMin = (millis() - gpsLastFixMs) / 60000UL;
+    if (gpsAgeMin > 255) gpsAgeMin = 255;
+  }
+
+  int32_t latRaw = gpsLastFixValid ? (int32_t)lround(gpsLastLat * 10000000.0) : 0;
+  int32_t lonRaw = gpsLastFixValid ? (int32_t)lround(gpsLastLng * 10000000.0) : 0;
+  uint8_t hdopRaw = (uint8_t)min(255.0f, max(0.0f, gpsHdop * 10.0f));
+
+  appData[11] = gpsFlags;
+  appData[12] = gpsSats;
+  appData[13] = hdopRaw;
+  appData[14] = (uint8_t)((latRaw >> 24) & 0xFF);
+  appData[15] = (uint8_t)((latRaw >> 16) & 0xFF);
+  appData[16] = (uint8_t)((latRaw >> 8) & 0xFF);
+  appData[17] = (uint8_t)(latRaw & 0xFF);
+  appData[18] = (uint8_t)((lonRaw >> 24) & 0xFF);
+  appData[19] = (uint8_t)((lonRaw >> 16) & 0xFF);
+  appData[20] = (uint8_t)((lonRaw >> 8) & 0xFF);
+  appData[21] = (uint8_t)(lonRaw & 0xFF);
+  appData[22] = (uint8_t)gpsAgeMin;
+
   impactoPendiente    = false;
   aceleracionGuardada = 0;
 }
@@ -254,6 +339,12 @@ void prepareTxFrame(uint8_t port)
 void setup()
 {
   Serial.begin(115200);
+
+  // GPS: VGPS se controla con GPIO14 y quedó independiente de Vext en la
+  // prueba de banco. Se mantiene encendido para conservar el fix entre frames.
+  pinMode(GPIO14, OUTPUT);
+  digitalWrite(GPIO14, LOW);
+  GPSSerial.begin(9600);
 
   pinMode(Vext, OUTPUT);
   digitalWrite(Vext, LOW); 

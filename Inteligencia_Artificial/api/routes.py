@@ -537,6 +537,13 @@ async def get_silos_overview():
             last_update=s["last_update"],
             grain_type=s.get("grain_type"),
             device_id=s.get("device_id"),
+            latitude=s.get("latitude"),
+            longitude=s.get("longitude"),
+            gps_fix=s.get("gps_fix"),
+            gps_has_fix=s.get("gps_has_fix"),
+            gps_satellites=s.get("gps_satellites"),
+            gps_hdop=s.get("gps_hdop"),
+            gps_age_min=s.get("gps_age_min"),
         )
         for s in raw
     ]
