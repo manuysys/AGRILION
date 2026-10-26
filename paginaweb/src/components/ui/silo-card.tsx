@@ -19,7 +19,11 @@ export default function SiloCard({ silo, rank, className = '' }: SiloCardProps) 
   const freshnessColor = getFreshnessColor(silo.sensor.lastSeen);
 
   const beamTone =
-    silo.state === 'critical' ? 'critical' : silo.state === 'warn' ? 'warn' : 'ok';
+    silo.state === 'critical'
+      ? 'critical'
+      : silo.state === 'warn' || silo.state === 'offline'
+        ? 'warn'
+        : 'ok';
 
   return (
     <Link

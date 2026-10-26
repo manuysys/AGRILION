@@ -28,20 +28,25 @@ function markerColor(state: SiloBag['state']): string {
   return '#10b981';
 }
 
-export default function SiloMap({ silos }: { silos: SiloBag[] }) {
+export default function SiloMap({
+  silos,
+  demoMode = false,
+}: {
+  silos: SiloBag[];
+  demoMode?: boolean;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [user, setUser] = useState<User | null | undefined>(undefined);
+  const [user, setUser] = useState<User | null | undefined>(
+    demoMode ? null : auth ? undefined : null
+  );
 
   useEffect(() => {
-    if (!auth) {
-      setUser(null);
-      return;
-    }
+    if (demoMode || !auth) return;
     return onAuthStateChanged(auth, (nextUser) => setUser(nextUser));
-  }, []);
+  }, [demoMode]);
 
   useEffect(() => {
-    if (user === undefined || !user) return;
+    if (!demoMode && (user === undefined || !user)) return;
 
     let cancelled = false;
     let map: LeafletMap | null = null;
@@ -136,9 +141,9 @@ export default function SiloMap({ silos }: { silos: SiloBag[] }) {
       cancelled = true;
       map?.remove();
     };
-  }, [silos, user]);
+  }, [silos, user, demoMode]);
 
-  if (user === undefined) {
+  if (!demoMode && user === undefined) {
     return (
       <div className="rounded-3xl border border-white/5 glass-dark p-6 text-sm text-zinc-500">
         Verificando sesión para cargar el mapa...
@@ -146,7 +151,7 @@ export default function SiloMap({ silos }: { silos: SiloBag[] }) {
     );
   }
 
-  if (!user) {
+  if (!demoMode && !user) {
     return (
       <div className="rounded-3xl border border-white/5 glass-dark p-6 flex items-center gap-4">
         <div className="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">

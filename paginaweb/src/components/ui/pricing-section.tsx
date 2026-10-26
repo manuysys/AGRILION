@@ -66,10 +66,13 @@ export function PricingSection() {
       
       <div className="text-center mb-20 relative z-10 max-w-3xl px-4">
         <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-white mb-6">
-          Planes flexibles para cada escala
+          Planes de referencia
         </h2>
         <p className="text-zinc-400 text-lg">
-          Invertí centavos por tonelada y ahorrá miles de dólares en pérdidas. Sin contratos a largo plazo.
+          Estructura tentativa para la propuesta. Los precios no representan una oferta comercial.
+        </p>
+        <p className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-amber-400/80">
+          Contenido ilustrativo
         </p>
       </div>
 

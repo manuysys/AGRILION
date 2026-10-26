@@ -46,15 +46,20 @@ object SilosDataManagerBaseDeDatos {
                 val meta = metaById[dto.siloId]
                 val latitude = dto.latitude ?: meta?.double("latitude")
                 val longitude = dto.longitude ?: meta?.double("longitude")
+                val stale = isStale(dto.lastUpdate)
                 SilobolsaBaseDeDatos(
                     id = dto.siloId,
                     nombre = meta?.string("name") ?: "Silobolsa ${dto.siloId}",
-                    estado = estadoFrom(dto.riskLevel),
+                    estado = if (stale) EstadoSilo.SIN_DATOS else estadoFrom(dto.riskLevel),
                     ultimaActualizacion = relativeTime(dto.lastUpdate),
                     tipoGrano = meta?.string("grainType") ?: dto.grainType ?: "Sin dato",
                     toneladas = meta?.double("tons") ?: 0.0,
                     ubicacion = meta?.string("location") ?: "Sin ubicación",
-                    diagnosticoSemanal = diagnostico(dto),
+                    diagnosticoSemanal = if (stale) {
+                        "Sin lecturas recientes. Verificá la alimentación, la señal LoRa y el estado del nodo."
+                    } else {
+                        diagnostico(dto)
+                    },
                     temperatura = dto.temperature,
                     humedad = dto.humidity,
                     co2 = dto.co2,
@@ -203,11 +208,7 @@ object SilosDataManagerBaseDeDatos {
     private fun relativeTime(iso: String): String {
         if (iso.isBlank()) return "Sin fecha"
         return try {
-            val clean = iso.take(19)
-            val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
-                timeZone = TimeZone.getTimeZone("UTC")
-            }
-            val date = parser.parse(clean) ?: return iso
+            val date = parseUtc(iso) ?: return iso
             val diff = System.currentTimeMillis() - date.time
             val minutes = diff / 60000
             when {
@@ -219,6 +220,24 @@ object SilosDataManagerBaseDeDatos {
         } catch (_: Exception) {
             iso
         }
+    }
+
+    private fun isStale(iso: String): Boolean {
+        if (iso.isBlank()) return false
+        return try {
+            val date = parseUtc(iso) ?: return false
+            System.currentTimeMillis() - date.time >= 6 * 60 * 60 * 1000L
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun parseUtc(iso: String): Date? {
+        val clean = iso.take(19)
+        val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+        return parser.parse(clean)
     }
 
     private fun Map<String, Any>.string(key: String): String? =

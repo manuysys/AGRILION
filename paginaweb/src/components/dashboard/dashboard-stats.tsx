@@ -22,84 +22,6 @@ function AnimatedCounter({ from, to, duration = 2, suffix = '' }: { from: number
   return <span>{count}{suffix}</span>;
 }
 
-// Animated sparkline using motion.polyline
-function AnimatedSparkline({ data, color }: { data: number[], color: string }) {
-  const [drawn, setDrawn] = useState(false);
-  const width = 64;
-  const height = 28;
-
-  useEffect(() => {
-    const t = setTimeout(() => setDrawn(true), 300);
-    return () => clearTimeout(t);
-  }, []);
-
-  if (data.length < 2) return null;
-
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const step = width / (data.length - 1);
-
-  const points = data
-    .map((v, i) => `${i * step},${height - ((v - min) / range) * height}`)
-    .join(' ');
-
-  // Area fill path
-  const areaPath = `M0,${height} ` + 
-    data.map((v, i) => `L${i * step},${height - ((v - min) / range) * height}`).join(' ') + 
-    ` L${width},${height} Z`;
-
-  return (
-    <svg width={width} height={height} className="shrink-0 overflow-visible">
-      {/* Area fill */}
-      <motion.path
-        d={areaPath}
-        fill={color}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: drawn ? 0.1 : 0 }}
-        transition={{ duration: 1, delay: 0.5 }}
-      />
-      {/* Line */}
-      <motion.polyline
-        points={points}
-        fill="none"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        initial={{ pathLength: 0, opacity: 0 }}
-        animate={{ pathLength: drawn ? 1 : 0, opacity: drawn ? 0.6 : 0 }}
-        transition={{ duration: 1.5, ease: "easeOut" }}
-      />
-      {/* End dot */}
-      {drawn && (
-        <motion.circle
-          cx={width}
-          cy={height - ((data[data.length - 1] - min) / range) * height}
-          r="2.5"
-          fill={color}
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 1.5, type: 'spring', stiffness: 400, damping: 15 }}
-        />
-      )}
-    </svg>
-  );
-}
-
-// Generate pseudo-random but deterministic sparkline data
-function generateSparkData(seed: number, trend: 'up' | 'down' | 'stable' = 'stable', points = 12): number[] {
-  const data: number[] = [];
-  let val = 50 + (seed * 17 % 30);
-  for (let i = 0; i < points; i++) {
-    const noise = Math.sin(seed * 7 + i * 3.7) * 10 + Math.cos(seed * 13 + i * 2.3) * 5;
-    const trendBias = trend === 'up' ? i * 1.5 : trend === 'down' ? -i * 1.5 : 0;
-    val = val + noise * 0.3 + trendBias * 0.1;
-    data.push(Math.max(0, Math.min(100, val)));
-  }
-  return data;
-}
-
 interface DashboardStatsProps {
   stats: DashboardStatsType;
 }
@@ -110,10 +32,8 @@ export default function DashboardStats({ stats }: DashboardStatsProps) {
       icon: Warehouse,
       label: 'SILOBOLSAS',
       valueContent: <AnimatedCounter from={0} to={stats.totalSilos} />,
-      detail: 'MONITOREADAS EN VIVO',
+      detail: 'TOTAL REGISTRADAS',
       color: 'text-emerald-400',
-      sparkColor: '#34d399',
-      sparkData: generateSparkData(1, 'up'),
     },
     {
       icon: Radio,
@@ -121,17 +41,17 @@ export default function DashboardStats({ stats }: DashboardStatsProps) {
       valueContent: <><AnimatedCounter from={0} to={stats.activeSensors} /> <span className="text-xl text-zinc-500">/ {stats.totalSensors}</span></>,
       detail: 'SENSORES ONLINE',
       color: 'text-blue-400',
-      sparkColor: '#60a5fa',
-      sparkData: generateSparkData(2, 'stable'),
     },
     {
       icon: Bell,
       label: 'ALERTAS ACTIVAS',
       valueContent: <AnimatedCounter from={0} to={stats.activeAlerts} />,
-      detail: stats.criticalAlerts > 0 ? `${stats.criticalAlerts} ALERTAS CRÍTICAS` : 'SISTEMA ESTABLE',
+      detail: stats.criticalAlerts > 0
+        ? `${stats.criticalAlerts} ALERTAS CRÍTICAS`
+        : stats.activeAlerts > 0
+          ? `${stats.activeAlerts} ALERTAS ACTIVAS`
+          : 'SIN ALERTAS',
       color: stats.criticalAlerts > 0 ? 'text-red-500' : 'text-amber-400',
-      sparkColor: stats.criticalAlerts > 0 ? '#ef4444' : '#fbbf24',
-      sparkData: generateSparkData(3, stats.criticalAlerts > 0 ? 'up' : 'down'),
     },
     {
       icon: Zap,
@@ -141,8 +61,6 @@ export default function DashboardStats({ stats }: DashboardStatsProps) {
         : <>—</>,
       detail: stats.averageBattery > 0 ? 'AUTONOMÍA DE RED' : 'SIN DATOS DE BATERÍA',
       color: stats.averageBattery > 0 && stats.averageBattery < 30 ? 'text-amber-400' : 'text-zinc-400',
-      sparkColor: stats.averageBattery > 0 && stats.averageBattery < 30 ? '#fbbf24' : '#a1a1aa',
-      sparkData: generateSparkData(4, stats.averageBattery > 0 && stats.averageBattery < 30 ? 'down' : 'stable'),
     },
   ];
 
@@ -184,9 +102,6 @@ export default function DashboardStats({ stats }: DashboardStatsProps) {
                   {item.valueContent}
                 </p>
                 <p className="text-[10px] mt-2 font-bold tracking-widest uppercase text-zinc-500">{item.detail}</p>
-              </div>
-              <div className="hidden sm:block">
-                <AnimatedSparkline data={item.sparkData} color={item.sparkColor} />
               </div>
             </div>
           </motion.div>

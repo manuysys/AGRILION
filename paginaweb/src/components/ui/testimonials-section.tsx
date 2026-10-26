@@ -37,10 +37,13 @@ export function TestimonialsSection() {
 
       <div className="text-center mb-20 relative z-10 max-w-3xl px-4">
         <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-white mb-6">
-          Confiado por los líderes del agro
+          Casos de uso ilustrativos
         </h2>
         <p className="text-zinc-400 text-lg">
-          No escuches solo lo que decimos nosotros. Escuchá los resultados.
+          Escenarios de ejemplo para mostrar el tipo de problemas que aborda Agrilion.
+        </p>
+        <p className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-amber-400/80">
+          Contenido de demostración · no son clientes reales
         </p>
       </div>
 

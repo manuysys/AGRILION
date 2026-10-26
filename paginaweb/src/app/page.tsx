@@ -18,6 +18,7 @@ import { RiveLogo } from '@/components/ui/rive-logo';
 import { Card } from "@/components/ui/card";
 import { Spotlight } from "@/components/ui/spotlight";
 import { FeaturesBento } from "@/components/ui/features-bento";
+import { HowItWorks } from "@/components/ui/how-it-works";
 import { DashboardPreview } from "@/components/ui/dashboard-preview";
 import { ProblemSection } from "@/components/ui/problem-section";
 import { AiSection } from "@/components/ui/ai-section";
@@ -29,6 +30,7 @@ import { CtaSection } from "@/components/ui/cta-section";
 const navLinks = [
   { href: '/', label: 'Inicio' },
   { href: '#features', label: 'Características' },
+  { href: '#como-funciona', label: 'Cómo funciona' },
   { href: '#tecnologia', label: 'Tecnología' },
   { href: '#dashboard', label: 'Dashboard' },
   { href: '#planes', label: 'Planes' },
@@ -61,7 +63,7 @@ function Navigation() {
         </Link>
 
         {/* Desktop Navigation */}
-        <div className="hidden lg:flex gap-8 text-sm font-medium text-zinc-400">
+        <div className="hidden xl:flex gap-8 text-sm font-medium text-zinc-400">
           {navLinks.map((link) => (
             <a
               key={link.href}
@@ -75,7 +77,7 @@ function Navigation() {
         </div>
 
         {/* Desktop Actions */}
-        <div className="hidden lg:flex gap-3 items-center">
+        <div className="hidden xl:flex gap-3 items-center">
           <Link href="/login" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors">
             Iniciar sesión
           </Link>
@@ -85,7 +87,7 @@ function Navigation() {
         </div>
 
         {/* Mobile Menu Button */}
-        <div className="flex lg:hidden gap-2 items-center">
+        <div className="flex xl:hidden gap-2 items-center">
           <Link href="/registro" className="bg-emerald-500 text-black px-4 py-2 rounded-full font-bold text-xs hover:bg-emerald-400 transition-all">
             Demo
           </Link>
@@ -117,7 +119,7 @@ function Navigation() {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="lg:hidden absolute top-full left-4 right-4 mt-2 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl"
+            className="xl:hidden absolute top-full left-4 right-4 mt-2 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl"
           >
             <div className="p-4 flex flex-col gap-1">
               {navLinks.map((link, i) => (
@@ -205,6 +207,9 @@ export default function Home() {
       <section id="features">
         <FeaturesBento />
       </section>
+
+      {/* HOW IT WORKS */}
+      <HowItWorks />
 
       {/* THE PROBLEM */}
       <ProblemSection />

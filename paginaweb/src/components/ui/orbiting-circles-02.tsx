@@ -29,7 +29,7 @@ const orbits = [
     icons: [
       { src: "https://cdn.simpleicons.org/nextdotjs/white", alt: "Next.js", angle: -60 },
       { src: "https://cdn.simpleicons.org/tensorflow/FF6F00", alt: "TensorFlow", angle: 0 },
-      { src: "https://cdn.simpleicons.org/amazonaws/FF9900", alt: "AWS", angle: 60 },
+      { src: "https://cdn.simpleicons.org/cloudflare/F38020", alt: "Cloudflare", angle: 60 },
     ],
   },
 ];

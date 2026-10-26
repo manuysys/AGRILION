@@ -5,16 +5,16 @@ import { CheckCircle2 } from "lucide-react";
 
 const benefits = [
   {
-    title: "Reducción de pérdidas hasta un 90%",
-    desc: "Evita que el deterioro silencioso arruine toneladas de granos."
+    title: "Menos pérdidas por deterioro",
+    desc: "Detectá focos de riesgo antes de que el deterioro silencioso dañe el grano."
   },
   {
-    title: "Monitoreo 100% remoto 24/7",
-    desc: "Datos actualizados minuto a minuto sin necesidad de visitar el campo."
+    title: "Monitoreo remoto continuo",
+    desc: "Consultá las lecturas y el histórico sin visitar el campo para cada medición."
   },
   {
-    title: "Alertas preventivas instantáneas",
-    desc: "Notificaciones por SMS y Email ante el menor cambio de temperatura."
+    title: "Alertas preventivas",
+    desc: "Avisos en el panel y la app ante cambios de riesgo o pérdida de conexión."
   },
   {
     title: "Predicción impulsada por IA",
@@ -25,8 +25,8 @@ const benefits = [
     desc: "Administra decenas de locaciones desde un único panel de control."
   },
   {
-    title: "Retorno de inversión en 6 meses",
-    desc: "El sistema se paga solo al prevenir la primera rotura o fermentación."
+    title: "Información para decidir",
+    desc: "Convertí el histórico y las alertas en decisiones de manejo y extracción."
   }
 ];
 

@@ -20,22 +20,33 @@ export default function HistoryClient({ silos }: HistoryClientProps) {
   const silo = silos.find((s) => s.id === selectedSilo);
 
   useEffect(() => {
-    if (!selectedSilo) {
-      setReadings([]);
-      return;
-    }
-
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    const controller = new AbortController();
 
-    fetch(`/api/ai/silos/${encodeURIComponent(selectedSilo)}/history?hours=24`)
-      .then((res) => {
+    // Se difiere el trabajo al próximo tick para no encadenar renders
+    // sincrónicos dentro del efecto.
+    const timer = window.setTimeout(async () => {
+      if (cancelled) return;
+
+      if (!selectedSilo) {
+        setReadings([]);
+        setLoading(false);
+        setError(null);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const res = await fetch(
+          `/api/ai/silos/${encodeURIComponent(selectedSilo)}/history?hours=24`,
+          { signal: controller.signal }
+        );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((data) => {
+        const data = await res.json();
         if (cancelled) return;
+
         const history = Array.isArray(data?.history) ? data.history : [];
         setReadings(
           history.map((h: { timestamp: string; temperature: number; humidity: number; co2: number; pressure?: number | null }) => ({
@@ -46,16 +57,19 @@ export default function HistoryClient({ silos }: HistoryClientProps) {
             pressure: h.pressure === null || h.pressure === undefined ? null : Number(h.pressure),
           }))
         );
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Error al cargar el histórico');
-      })
-      .finally(() => {
+      } catch (err) {
+        if (!cancelled && !(err instanceof DOMException && err.name === 'AbortError')) {
+          setError(err instanceof Error ? err.message : 'Error al cargar el historial');
+        }
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    }, 0);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
+      controller.abort();
     };
   }, [selectedSilo]);
 

@@ -21,10 +21,10 @@ export function CtaSection() {
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 mix-blend-overlay pointer-events-none" />
           
           <h2 className="text-4xl md:text-6xl font-black tracking-tight text-white mb-6 relative z-10">
-            Comenzá a monitorear tus silobolsas hoy.
+            Empezá a monitorear tus silobolsas hoy.
           </h2>
           <p className="text-xl text-zinc-400 max-w-2xl mb-12 relative z-10">
-            Únete a cientos de productores que ya confían en la inteligencia artificial para proteger el valor de su cosecha. Instalación rápida y resultados desde el primer día.
+            Explorá el dashboard con datos de demostración o solicitá una prueba con hardware. El objetivo es simple: convertir datos en decisiones antes de que aparezca una pérdida.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 relative z-10">

@@ -104,7 +104,7 @@ export const mockAlerts: Alert[] = [
 ];
 
 // ── Silo Bags ──
-export const mockSiloBags: SiloBag[] = [
+const mockSiloBagsBase: SiloBag[] = [
   {
     id: 'SB-005',
     name: 'Lote Sur A',
@@ -232,6 +232,32 @@ export const mockSiloBags: SiloBag[] = [
     estimatedTons: 130,
   },
 ];
+
+// Coordenadas simuladas para que el mapa también se pueda mostrar en la demo
+// sin hardware. No representan ubicaciones reales de producción.
+const mockCoordinates: Record<string, { latitude: number; longitude: number }> = {
+  'SB-005': { latitude: -34.615, longitude: -58.470 },
+  'SB-003': { latitude: -34.480, longitude: -58.520 },
+  'SB-010': { latitude: -34.550, longitude: -58.320 },
+  'SB-001': { latitude: -34.600, longitude: -58.400 },
+  'SB-007': { latitude: -34.580, longitude: -58.420 },
+  'SB-011': { latitude: -34.700, longitude: -58.600 },
+};
+
+export const mockSiloBags: SiloBag[] = mockSiloBagsBase.map((silo) => {
+  const coordinates = mockCoordinates[silo.id] ?? null;
+  return {
+    ...silo,
+    coordinates,
+    gps: {
+      hasFix: Boolean(coordinates),
+      currentFix: Boolean(coordinates) && silo.sensor.connection === 'online',
+      satellites: coordinates ? 9 : null,
+      hdop: coordinates ? 0.8 : null,
+      ageMin: coordinates ? 0 : null,
+    },
+  };
+});
 
 // ── Dashboard Stats ──
 export const mockDashboardStats: DashboardStats = {

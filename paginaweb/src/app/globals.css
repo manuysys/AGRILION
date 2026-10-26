@@ -259,3 +259,15 @@ body {
 .animate-grain-float {
   animation: grain-float 5s ease-in-out infinite;
 }
+
+/* Accesibilidad: respetar la preferencia del sistema de movimiento reducido. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

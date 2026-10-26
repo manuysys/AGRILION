@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import Sidebar from '@/components/layout/sidebar';
 import BottomNav from '@/components/layout/bottom-nav';
 import DashboardHeader from '@/components/layout/dashboard-header';
-import { fetchDashboardStats } from '@/lib/data-service';
+import DataStatusBanner from '@/components/dashboard/data-status-banner';
+import { fetchDashboardStats, IS_DEMO_MODE } from '@/lib/data-service';
+import { checkHealth } from '@/lib/ai-api';
 import { formatRelativeTime } from '@/lib/formatters';
 import PageTransition from '@/components/ui/page-transition';
 import 'leaflet/dist/leaflet.css';
@@ -20,23 +22,25 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Fetch stats con fallback seguro (si falla, usar defaults)
-  let stats;
-  try {
-    stats = await fetchDashboardStats();
-  } catch (error) {
+  // Stats y health en paralelo con fallback seguro.
+  const statsPromise = fetchDashboardStats().catch((error) => {
     console.error('Error fetching dashboard stats:', error);
-    stats = {
+    return {
       totalSilos: 0,
       activeSensors: 0,
       totalSensors: 0,
       activeAlerts: 0,
       criticalAlerts: 0,
       averageBattery: 0,
-      lastGlobalUpdate: new Date().toISOString(),
-      systemHealth: 'ok' as const,
+      lastGlobalUpdate: new Date(0).toISOString(),
+      systemHealth: 'warn' as const,
     };
-  }
+  });
+  const healthPromise = IS_DEMO_MODE
+    ? Promise.resolve(true)
+    : checkHealth().then(Boolean);
+
+  const [stats, apiOnline] = await Promise.all([statsPromise, healthPromise]);
 
   return (
     <div className="flex min-h-screen bg-black text-white selection:bg-emerald-500/30">
@@ -50,6 +54,13 @@ export default async function DashboardLayout({
         />
 
         <main className="flex-1 pb-20 lg:pb-6 relative">
+          <div className="mx-auto w-full max-w-[1400px] px-4 pt-4 lg:px-6">
+            <DataStatusBanner
+              stats={stats}
+              isDemo={IS_DEMO_MODE}
+              apiOnline={apiOnline}
+            />
+          </div>
           <PageTransition>
             {children}
           </PageTransition>

@@ -1,72 +1,131 @@
-# 🌾 Agrilion
+# Agrilion
 
-### Sistema inteligente de monitoreo para silobolsas
+Sistema IoT de monitoreo para silobolsas. Mide temperatura, humedad, presión,
+impacto y CO₂, y presenta el estado de cada silo en una app Android y un
+dashboard web.
 
-Agrilion es un sistema IoT diseñado para monitorear en tiempo real el
-estado de granos almacenados en silobolsas, permitiendo detectar
-condiciones de riesgo antes de que ocurran pérdidas económicas.
+## Arquitectura
 
-------------------------------------------------------------------------
+```text
+Sensores SHT30 / BME280 / ADXL345 / SCD4x
+              │ I2C
+       CubeCell HTCC-AB02S + GPS Air530Z
+              │ LoRaWAN AU915
+            Gateway → TTN
+              │ MQTT/TLS
+        TTN_MQTT.py → HiveMQ
+              │
+   MQTT_INFLUXDB_FIREBASE.py
+        ├── InfluxDB 3 (series temporales)
+        └── Firebase (estado y ubicación)
+              │
+   API FastAPI + riesgo + LSTM
+              │
+   Next.js (web) + Android (app)
+```
 
-## 🚀 Características principales
+## Componentes
 
--   Comunicación LoRa de largo alcance\
--   Batería de larga duración (6--12 meses)\
--   Sensores de temperatura, humedad y gases\
--   Envío de datos cada 1--2 horas\
--   Visualización web\
--   Sistema de alertas tempranas\
--   Preparado para integración con IA
+| Carpeta | Descripción |
+|---------|-------------|
+| `Backend_Arduino/` | Firmware CubeCell, payload v2, decoder TTN y puentes MQTT |
+| `Inteligencia_Artificial/` | API FastAPI, riesgo, modelo LSTM, chat e InfluxDB |
+| `AppCelular/` | App Android con Firebase, dashboard, mapa y chat |
+| `paginaweb/` | Dashboard y landing en Next.js |
+| `docs/` | Integración Android, GPS y guía de demo |
 
-------------------------------------------------------------------------
+## Funcionalidades
 
-## 🏗️ Arquitectura
+- Lecturas en tiempo real y persistencia histórica.
+- Dashboard con estado global, riesgo, alertas, histórico y mapa.
+- App Android con autenticación, mis silos, detalle, chat y mapa.
+- GPS Air530Z con payload v2 y visualización en mapa.
+- Detección de sensores sin datos recientes (más de 6 h).
+- Modo demostración con seis silobolsas simuladas y coordenadas de ejemplo.
+- Chat con IA y fallback por reglas.
 
-Sensores → Dispositivo IoT (CubeCell) → LoRa → Gateway → Backend →
-Dashboard
+## Demo
 
-------------------------------------------------------------------------
+- **Mock web:** https://paginaweb-seven-mu.vercel.app/dashboard
+- **Real:** https://agrilion-live.vercel.app/dashboard (requiere túnel y API local)
+- **Guía de presentación:** `docs/DEMO_PROFESOR.md`
 
-## ⚙️ Tecnologías
+Modo demo local:
 
--   Hardware: CubeCell + sensores\
--   Comunicación: LoRa / MQTT\
--   Backend: Firebase\
--   Frontend: Flutter Web\
--   Procesamiento: Python
+```powershell
+cd paginaweb
+$env:NEXT_PUBLIC_MOCK_MODE = "true"
+npm run dev
+```
 
-------------------------------------------------------------------------
+Para volver al modo real:
 
-## ⚠️ Alertas
+```powershell
+Remove-Item Env:NEXT_PUBLIC_MOCK_MODE
+npm run dev
+```
 
--   Humedad alta → posible filtración\
--   Temperatura elevada → actividad microbiana\
--   CO₂ alto → deterioro del grano
+## Ejecutar el backend
 
-Estados: - Normal\
-- Advertencia\
-- Riesgo
+```powershell
+cd Inteligencia_Artificial
+uvicorn api.app:app --host 0.0.0.0 --port 8000
+```
 
-------------------------------------------------------------------------
+La API queda documentada en `http://localhost:8000/docs`. Los puentes de TTN,
+InfluxDB y Firebase se describen en `Backend_Arduino/` y en la guía de demo.
 
-## 📊 Estado
+## App Android
 
--   Comunicación: OK\
--   Backend: OK\
--   Visualización: Básica\
--   Alertas: En desarrollo\
--   IA: En desarrollo
+```powershell
+cd AppCelular
+.\gradlew.bat assembleDebug --no-daemon
+```
 
-------------------------------------------------------------------------
+APK:
 
-## 🎯 Objetivo
+```text
+AppCelular/app/build/outputs/apk/debug/app-debug.apk
+```
 
-Reducir pérdidas agrícolas mediante monitoreo inteligente y alertas
-tempranas.
+La URL de la API se configura desde **Configuración → Conexión API**. Para el
+emulador se usa `http://10.0.2.2:8000/`.
 
-------------------------------------------------------------------------
+## Firmware
 
-## 👨‍💻 Autor
+El sketch está en `Backend_Arduino/Codigo_TransmisionLoraWAN_Sensores/`.
+Compila con:
 
-Juan Manuel Iglesias\
-Proyecto Agrilion --- 2026
+```powershell
+arduino-cli compile --upload -p COM4 `
+  --fqbn CubeCell:CubeCell:CubeCell-GPS `
+  --board-options "LORAWAN_REGION=2,LORAWAN_RGB=0,LORAWAN_DebugLevel=2" .
+```
+
+Detalles de alimentación, payload y GPS: README del sketch y
+`docs/GPS_INTEGRACION.md`.
+
+## Estado y limitaciones
+
+- El SCD4x se identifica como SCD40 y no entrega una medición válida de CO₂; se
+  muestra “Sin dato”, no 0 ppm.
+- El GPS no logró un fix real bajo techo. Necesita vista al cielo o antena
+  externa.
+- La frecuencia de transmisión está en 20 s para pruebas; en producción conviene
+  aumentarla para ahorrar batería.
+- `/api/v1/silos/overview` todavía no filtra por usuario; la autenticación y
+  autorización por propietario quedan como deuda para producción.
+- La versión real de Vercel depende del túnel a la API local.
+
+## Documentación
+
+- `docs/DEMO_PROFESOR.md`
+- `docs/GPS_INTEGRACION.md`
+- `docs/ANDROID_INTEGRACION.md`
+- `Backend_Arduino/Codigo_TransmisionLoraWAN_Sensores/README.md`
+
+## Autor
+
+Juan Manuel Iglesias — Proyecto Agrilion, 2026.
+
+Contacto: eest4.74.agrilion@gmail.com

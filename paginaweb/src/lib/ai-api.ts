@@ -91,6 +91,13 @@ export interface HealthResponse {
 const AI_PROXY_BASE = '/api/ai';
 const AI_SERVER_BASE = `${process.env.AI_API_URL || 'http://localhost:8000'}/api/v1`;
 
+function requestOptions(timeoutMs = 8000): RequestInit {
+  return {
+    cache: 'no-store',
+    signal: AbortSignal.timeout(timeoutMs),
+  };
+}
+
 function apiUrl(path: string): string {
   if (typeof window === 'undefined') {
     return `${AI_SERVER_BASE}${path}`;
@@ -105,7 +112,7 @@ function apiUrl(path: string): string {
  */
 export async function checkHealth(): Promise<HealthResponse | null> {
   try {
-    const res = await fetch(apiUrl('/health'));
+    const res = await fetch(apiUrl('/health'), requestOptions(4000));
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -118,7 +125,7 @@ export async function checkHealth(): Promise<HealthResponse | null> {
  */
 export async function getSilosOverview(): Promise<SiloOverview[]> {
   try {
-    const res = await fetch(apiUrl('/silos/overview'));
+    const res = await fetch(apiUrl('/silos/overview'), requestOptions());
     if (!res.ok) {
       console.warn(`AI API overview failed: ${res.status}`);
       return [];
@@ -139,7 +146,7 @@ export async function getSiloHistory(
   hours: number = 24
 ): Promise<SiloHistoryPoint[]> {
   try {
-    const res = await fetch(apiUrl(`/silos/${siloId}/history?hours=${hours}`));
+    const res = await fetch(apiUrl(`/silos/${siloId}/history?hours=${hours}`), requestOptions());
     if (!res.ok) {
       console.warn(`AI API history failed: ${res.status}`);
       return [];
@@ -159,7 +166,7 @@ export async function getSiloCurrent(
   siloId: string
 ): Promise<SiloOverview | null> {
   try {
-    const res = await fetch(apiUrl(`/silos/${siloId}/current`));
+    const res = await fetch(apiUrl(`/silos/${siloId}/current`), requestOptions());
     if (!res.ok) return null;
     return await res.json();
   } catch {

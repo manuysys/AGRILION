@@ -25,12 +25,26 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 El dashboard incluye `src/components/dashboard/silo-map.tsx`:
 
 - Leaflet 1.9.4 con tiles OpenStreetMap y filtro CSS oscuro (sin API key).
-- Solo se muestra para usuarios autenticados; un invitado ve el aviso de login.
+- En modo real solo se muestra para usuarios autenticados; un invitado ve el
+  aviso de login.
+- En modo demostración se muestran coordenadas simuladas sin login.
 - Marcadores para silos con `gps_has_fix=true`, popup y link al detalle.
 - Los datos llegan de `GET /api/v1/silos/overview`; `data-service.ts` los mapea
   a `SiloBag.coordinates` y `SiloBag.gps`.
 
 La integración completa se documenta en `../docs/GPS_INTEGRACION.md`.
+
+## Estado de datos y modo demo
+
+- Si la API no responde, el dashboard muestra un aviso rojo y no inventa datos.
+- Si la última lectura supera el umbral de 6 h, el sensor se marca como offline:
+  el hero dice “Sin datos en vivo” y se muestra la antigüedad real.
+- El botón **Actualizar** vuelve a pedir los datos al servidor.
+- Las sparklines decorativas se retiraron para no mostrar tendencias inventadas.
+- `NEXT_PUBLIC_MOCK_MODE=true` activa 6 silos simulados, banner de demostración,
+  coordenadas de ejemplo y mapa habilitado sin login.
+
+Guía de presentación: `../docs/DEMO_PROFESOR.md`.
 
 ## Learn More
 

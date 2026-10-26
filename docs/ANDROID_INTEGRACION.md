@@ -57,6 +57,9 @@ La tarjeta **MAPA DE SILOS** del Dashboard usa `SiloMapCard.kt` con
 - Los datos GPS llegan por `SiloOverviewDto` (`latitude`, `longitude`,
   `gps_fix`, `gps_has_fix`, `gps_satellites`, `gps_hdop`, `gps_age_min`) y,
   como respaldo, desde los metadatos del silo en Firestore.
+- Si la última lectura tiene más de 6 horas, el silo se muestra como
+  `Sin Datos` y el dashboard avisa que no está enviando datos. La lectura
+  histórica sigue visible en el detalle.
 
 Prueba manual realizada: build `assembleDebug`, instalación en emulador, login
 de prueba, marcador visible sobre Buenos Aires y click al detalle. El usuario

@@ -1,19 +1,20 @@
-// Data service layer — abstracts mock vs API data sources
+// Data service layer — abstracts demo vs real API data sources.
 //
-// When MOCK_MODE=true (default), returns hardcoded mock data.
-// When MOCK_MODE=false, calls the Python AI API via Next.js rewrites.
-// If the API is unreachable, gracefully falls back to mock data.
+// When NEXT_PUBLIC_MOCK_MODE is true, returns the simulated demo data.
+// When it is false, calls the Python AI API via Next.js rewrites.
+// En modo real no se inventan datos: si la API falla o no hay lecturas se
+// devuelve un estado vacío y la UI muestra el aviso correspondiente.
 
-import type { SiloBag, Alert, DashboardStats } from '@/types';
+import type { SiloBag, Alert, DashboardStats, SensorConnectionStatus } from '@/types';
 import { mockSiloBags, mockAlerts, mockDashboardStats } from './mock-data';
-import { getRiskBand } from './thresholds';
+import { getRiskBand, THRESHOLDS } from './thresholds';
 import {
   getSilosOverview,
   getSiloHistory,
   type SiloOverview,
 } from './ai-api';
 
-const MOCK_MODE = process.env.NEXT_PUBLIC_MOCK_MODE !== 'false';
+export const IS_DEMO_MODE = process.env.NEXT_PUBLIC_MOCK_MODE !== 'false';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,16 @@ function riskLevelToState(level: string): 'ok' | 'warn' | 'critical' {
   if (level === 'CRITICAL') return 'critical';
   if (level === 'WARNING') return 'warn';
   return 'ok';
+}
+
+function connectionStatus(lastSeen: string): SensorConnectionStatus {
+  const timestamp = new Date(lastSeen).getTime();
+  if (!Number.isFinite(timestamp)) return 'offline';
+
+  const age = Date.now() - timestamp;
+  if (age >= THRESHOLDS.sensorTimeout.offline) return 'offline';
+  if (age >= THRESHOLDS.sensorTimeout.delayed) return 'delayed';
+  return 'online';
 }
 
 function riskScoreToLabel(score: number): string {
@@ -46,8 +57,11 @@ function capitalize(text: string): string {
  * (no se inventan ubicación, batería, toneladas ni fechas).
  */
 function overviewToSiloBag(o: SiloOverview): SiloBag {
-  const state = riskLevelToState(o.risk_level);
   const now = new Date().toISOString();
+  const lastSeen = o.last_update || now;
+  const connection = connectionStatus(lastSeen);
+  const riskState = riskLevelToState(o.risk_level);
+  const state: SiloBag['state'] = connection === 'offline' ? 'offline' : riskState;
   const hasCoordinates = typeof o.latitude === 'number' && typeof o.longitude === 'number';
   const coordinates = hasCoordinates
     ? { latitude: o.latitude as number, longitude: o.longitude as number }
@@ -76,29 +90,33 @@ function overviewToSiloBag(o: SiloOverview): SiloBag {
       trend: 'stable',
     },
     currentReading: {
-      timestamp: o.last_update || now,
+      timestamp: lastSeen,
       temperature: o.temperature,
       humidity: o.humidity,
       co2: o.co2,
       pressure: o.pressure ?? null,
     },
     sensor: {
-      connection: 'online',
+      connection,
       battery: null,
-      lastSeen: o.last_update || now,
+      lastSeen,
       signalStrength: null,
     },
     interpretation: {
-      summary: state === 'ok'
-        ? 'Parámetros dentro de rangos normales'
-        : state === 'warn'
-          ? 'Condiciones requieren monitoreo'
-          : 'Riesgo detectado — requiere intervención',
-      recommendation: state === 'critical'
-        ? 'Inspección inmediata recomendada'
-        : state === 'warn'
-          ? 'Revisar en próximas 24 horas'
-          : 'Sin acción requerida',
+      summary: connection === 'offline'
+        ? 'Sin datos recientes del sensor'
+        : riskState === 'ok'
+          ? 'Parámetros dentro de rangos normales'
+          : riskState === 'warn'
+            ? 'Condiciones requieren monitoreo'
+            : 'Riesgo detectado — requiere intervención',
+      recommendation: connection === 'offline'
+        ? 'Verificar alimentación, señal LoRa y estado del nodo'
+        : riskState === 'critical'
+          ? 'Inspección inmediata recomendada'
+          : riskState === 'warn'
+            ? 'Revisar en próximas 24 horas'
+            : 'Sin acción requerida',
       confidence: null,
       factors: [],
     },
@@ -116,17 +134,16 @@ const EMPTY_STATS: DashboardStats = {
   activeAlerts: 0,
   criticalAlerts: 0,
   averageBattery: 0,
-  lastGlobalUpdate: new Date().toISOString(),
-  systemHealth: 'ok',
+  lastGlobalUpdate: new Date(0).toISOString(),
+  systemHealth: 'warn',
 };
 
 // ─── Dashboard Stats ─────────────────────────────────────────────────────────
 export async function fetchDashboardStats(): Promise<DashboardStats> {
-  if (MOCK_MODE) return mockDashboardStats;
+  if (IS_DEMO_MODE) return mockDashboardStats;
 
   try {
-    const silos = await fetchSilobags();
-    const alerts = await fetchAlerts();
+    const [silos, alerts] = await Promise.all([fetchSilobags(), fetchAlerts()]);
     const activeAlerts = alerts.filter(a => !a.acknowledged);
     const criticalAlerts = activeAlerts.filter(a => a.severity === 'critical' || a.severity === 'high');
 
@@ -141,10 +158,16 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
 
     const criticalCount = silos.filter(s => s.state === 'critical').length;
     const warnCount = silos.filter(s => s.state === 'warn').length;
+    const staleCount = silos.filter(s => s.sensor.connection !== 'online').length;
 
     let systemHealth: 'ok' | 'warn' | 'critical' = 'ok';
     if (criticalCount > 0) systemHealth = 'critical';
-    else if (warnCount > 0) systemHealth = 'warn';
+    else if (warnCount > 0 || staleCount > 0 || totalSilos === 0) systemHealth = 'warn';
+
+    const latestReading = silos.reduce((latest, silo) => {
+      const value = new Date(silo.sensor.lastSeen).getTime();
+      return Number.isFinite(value) && value > latest ? value : latest;
+    }, 0);
 
     return {
       totalSilos,
@@ -153,7 +176,7 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
       activeAlerts: activeAlerts.length,
       criticalAlerts: criticalAlerts.length,
       averageBattery: avgBattery,
-      lastGlobalUpdate: new Date().toISOString(),
+      lastGlobalUpdate: latestReading > 0 ? new Date(latestReading).toISOString() : EMPTY_STATS.lastGlobalUpdate,
       systemHealth,
     };
   } catch {
@@ -164,7 +187,7 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
 
 // ── Silo Bags ──
 export async function fetchSilobags(): Promise<SiloBag[]> {
-  if (MOCK_MODE) {
+  if (IS_DEMO_MODE) {
     // Sort by risk score (descending) for ranking
     return [...mockSiloBags].sort((a, b) => b.riskScore.value - a.riskScore.value);
   }
@@ -177,7 +200,7 @@ export async function fetchSilobags(): Promise<SiloBag[]> {
 
 // ── Single Silo Detail ──
 export async function fetchSiloDetail(id: string): Promise<SiloBag | null> {
-  if (MOCK_MODE) {
+  if (IS_DEMO_MODE) {
     return mockSiloBags.find((s) => s.id === id) ?? null;
   }
 
@@ -216,7 +239,7 @@ export async function fetchAlerts(filter?: {
   siloId?: string;
   acknowledged?: boolean;
 }): Promise<Alert[]> {
-  if (MOCK_MODE) {
+  if (IS_DEMO_MODE) {
     let alerts = [...mockAlerts];
 
     if (filter?.severity) {
@@ -245,28 +268,58 @@ export async function fetchAlerts(filter?: {
     const now = new Date().toISOString();
 
     for (const silo of overview) {
+      const lastSeen = silo.last_update || now;
+      const connection = connectionStatus(lastSeen);
+      const siloName = `Silobolsa ${silo.silo_id.replace('SILO_', 'SB-')}`;
+
       if (silo.risk_level === 'CRITICAL') {
         alerts.push({
           id: `alert-${silo.silo_id}-critical`,
           siloId: silo.silo_id,
-          siloName: `Silobolsa ${silo.silo_id.replace('SILO_', 'SB-')}`,
+          siloName,
           severity: 'critical',
           title: 'Riesgo crítico detectado',
           description: `Score de riesgo: ${silo.risk_score}/100. T:${silo.temperature}°C H:${silo.humidity}% CO2:${silo.co2}ppm`,
           recommendation: 'Inspección inmediata recomendada',
-          timestamp: silo.last_update || now,
+          timestamp: lastSeen,
           acknowledged: false,
         });
       } else if (silo.risk_level === 'WARNING') {
         alerts.push({
           id: `alert-${silo.silo_id}-warning`,
           siloId: silo.silo_id,
-          siloName: `Silobolsa ${silo.silo_id.replace('SILO_', 'SB-')}`,
+          siloName,
           severity: 'medium',
           title: 'Condiciones inestables',
           description: `Score de riesgo: ${silo.risk_score}/100. Monitorear en las próximas 24 horas.`,
           recommendation: 'Revisar condiciones de almacenamiento',
-          timestamp: silo.last_update || now,
+          timestamp: lastSeen,
+          acknowledged: false,
+        });
+      }
+
+      if (connection === 'offline') {
+        alerts.push({
+          id: `alert-${silo.silo_id}-offline`,
+          siloId: silo.silo_id,
+          siloName,
+          severity: 'medium',
+          title: 'Sensor sin datos recientes',
+          description: `La última lectura se recibió el ${new Date(lastSeen).toLocaleString('es-AR')}.`,
+          recommendation: 'Verificar alimentación, señal LoRa y estado del nodo',
+          timestamp: lastSeen,
+          acknowledged: false,
+        });
+      } else if (connection === 'delayed') {
+        alerts.push({
+          id: `alert-${silo.silo_id}-delayed`,
+          siloId: silo.silo_id,
+          siloName,
+          severity: 'low',
+          title: 'Lectura demorada',
+          description: `La última lectura se recibió el ${new Date(lastSeen).toLocaleString('es-AR')}.`,
+          recommendation: 'Confirmar la conectividad del nodo antes del próximo ciclo',
+          timestamp: lastSeen,
           acknowledged: false,
         });
       }

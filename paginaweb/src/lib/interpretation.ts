@@ -113,6 +113,14 @@ export function interpretSystem(silos: SiloBag[]): {
   const warning = silos.filter((s) => s.state === 'warn');
   const offline = silos.filter((s) => s.state === 'offline');
 
+  if (silos.length === 0) {
+    return {
+      summary: 'Sin datos',
+      detail: 'No hay silobolsas con lecturas disponibles. Revisá la conexión de los nodos y la API.',
+      state: 'warn',
+    };
+  }
+
   if (critical.length > 0) {
     return {
       summary: `${critical.length} silobolsa${critical.length > 1 ? 's' : ''} en estado CRÍTICO`,
@@ -130,9 +138,12 @@ export function interpretSystem(silos: SiloBag[]): {
   }
 
   if (offline.length > 0) {
+    const allOffline = offline.length === silos.length;
     return {
-      summary: 'Sistema estable — sensores offline detectados',
-      detail: `${offline.map((s) => s.name).join(', ')} sin datos recientes`,
+      summary: allOffline ? 'Sin datos en vivo' : 'Sensores offline detectados',
+      detail: allOffline
+        ? 'Los nodos no están enviando datos recientes. Se muestran las últimas lecturas conocidas.'
+        : `${offline.map((s) => s.name).join(', ')} sin datos recientes`,
       state: 'warn',
     };
   }

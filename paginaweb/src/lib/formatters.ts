@@ -9,6 +9,9 @@ import { THRESHOLDS } from './thresholds';
 export function formatRelativeTime(isoString: string): string {
   const now = new Date();
   const date = new Date(isoString);
+  if (!isoString || Number.isNaN(date.getTime()) || date.getFullYear() < 2000) {
+    return 'sin datos';
+  }
   const diffMs = now.getTime() - date.getTime();
   const diffSec = Math.floor(diffMs / 1000);
   const diffMin = Math.floor(diffSec / 60);

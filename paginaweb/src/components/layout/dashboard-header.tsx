@@ -63,7 +63,7 @@ export default function DashboardHeader({
           <div className="hidden sm:flex items-center gap-2">
             <StatusPill state={systemHealth} size="sm" />
             <span className="text-xs text-[var(--text-muted)] font-data hidden md:inline">
-              Actualizado {lastUpdate}
+              {lastUpdate === 'sin datos' ? 'Sin datos' : `Actualizado ${lastUpdate}`}
             </span>
           </div>
         </div>

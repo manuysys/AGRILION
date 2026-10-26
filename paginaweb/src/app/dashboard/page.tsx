@@ -1,4 +1,9 @@
-import { fetchSilobags, fetchDashboardStats, fetchAlerts } from '@/lib/data-service';
+import {
+  fetchSilobags,
+  fetchDashboardStats,
+  fetchAlerts,
+  IS_DEMO_MODE,
+} from '@/lib/data-service';
 import { interpretSystem } from '@/lib/interpretation';
 import DashboardHero from '@/components/dashboard/dashboard-hero';
 import DashboardStats from '@/components/dashboard/dashboard-stats';
@@ -31,7 +36,7 @@ export default async function DashboardPage() {
       <DashboardStats stats={stats} />
 
       {/* Mapa de ubicaciones GPS (solo para usuarios logueados) */}
-      <SiloMap silos={silos} />
+      <SiloMap silos={silos} demoMode={IS_DEMO_MODE} />
 
       {/* Main content grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
