@@ -1,10 +1,13 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import Sidebar from '@/components/layout/sidebar';
 import BottomNav from '@/components/layout/bottom-nav';
 import DashboardHeader from '@/components/layout/dashboard-header';
 import DataStatusBanner from '@/components/dashboard/data-status-banner';
+import SessionRefresh from '@/components/auth/session-refresh';
 import { fetchDashboardStats, IS_DEMO_MODE } from '@/lib/data-service';
 import { checkHealth } from '@/lib/ai-api';
+import { getSessionToken } from '@/lib/session-server';
 import { formatRelativeTime } from '@/lib/formatters';
 import PageTransition from '@/components/ui/page-transition';
 import 'leaflet/dist/leaflet.css';
@@ -22,6 +25,12 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // El modo demo es público; el modo real exige una sesión de Firebase.
+  const sessionToken = await getSessionToken();
+  if (!IS_DEMO_MODE && !sessionToken) {
+    redirect('/login');
+  }
+
   // Stats y health en paralelo con fallback seguro.
   const statsPromise = fetchDashboardStats().catch((error) => {
     console.error('Error fetching dashboard stats:', error);
@@ -44,6 +53,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-screen bg-black text-white selection:bg-emerald-500/30">
+      <SessionRefresh enabled={!IS_DEMO_MODE} />
       <Sidebar alertCount={stats.activeAlerts} />
 
       <div className="flex-1 flex flex-col min-w-0">

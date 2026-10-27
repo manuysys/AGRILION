@@ -34,6 +34,15 @@ El dashboard incluye `src/components/dashboard/silo-map.tsx`:
 
 La integración completa se documenta en `../docs/GPS_INTEGRACION.md`.
 
+## Autenticación del dashboard real
+
+- En modo real, `/dashboard` exige una sesión de Firebase.
+- El login/registro guarda el ID token en una cookie `httpOnly` (`agrilion_session`);
+  el servidor la lee y envía `Authorization: Bearer` a la API.
+- `SessionRefresh` renueva la cookie cada 20 minutos y al volver a la pestaña.
+- La API filtra los silos por propietario; no se muestran datos de otros usuarios.
+- El modo demo no exige login y usa datos simulados.
+
 ## Estado de datos y modo demo
 
 - Si la API no responde, el dashboard muestra un aviso rojo y no inventa datos.

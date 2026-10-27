@@ -88,6 +88,7 @@ interface SilosApiService {
         fun create(): SilosApiService {
             val client = OkHttpClient.Builder()
                 .addInterceptor(ApiConfig.dynamicBaseUrlInterceptor())
+                .addInterceptor(ApiConfig.firebaseAuthInterceptor())
                 .connectTimeout(20, TimeUnit.SECONDS)
                 .readTimeout(90, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)

@@ -1,3 +1,6 @@
+> [!NOTE]
+> Documento histórico de diseño. El estado vigente está en README.md y docs/.
+
 # AGRILION — Arquitectura del Sistema Integrado
 
 > Documento técnico que describe cómo se conectan todos los componentes del sistema:

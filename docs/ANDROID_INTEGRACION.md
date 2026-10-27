@@ -106,12 +106,13 @@ AppCelular/app/build/outputs/apk/debug/app-debug.apk
 
 ## Limitaciones conocidas
 
-- `/api/v1/silos/overview` devuelve todos los silos. La app todavía no filtra
-  por propietario ni envía el ID token; el backend debe agregar autenticación y
-  autorización por usuario.
+- La app envía el Firebase ID token en cada request. La API valida el token y
+  filtra el overview por los silos del usuario; no se muestran silos ajenos.
 - El alta de un silo crea un documento con ID aleatorio. Para asociarlo a un
   sensor físico hay que registrar el mapeo global `sensors/{deviceId}` con el
   mismo `siloId` (hoy lo hace el backend/administrador, no la app).
+- La build debug permite HTTP local; la release exige HTTPS. Configurar la URL
+  de producción antes de generar el APK final.
 - Las alertas de la pantalla de notificaciones se derivan del estado/riesgo de
   los silos; no se listan aún documentos de `users/{uid}/alerts`.
 - Las cotizaciones BCR del dashboard son valores de referencia; no se actualizan

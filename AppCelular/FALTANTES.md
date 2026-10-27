@@ -1,3 +1,8 @@
+> [!NOTE]
+> Reporte histórico de brechas. Algunas funcionalidades de la app y de la web
+> cambiaron desde su redacción. El estado vigente de la app está en
+> `../docs/ANDROID_INTEGRACION.md`.
+
 # Reporte de Features Faltantes (Comparativa Web Agrilion+ vs. App Android)
 
 Este documento compara pantalla por pantalla la aplicación web **Agrilion+** (`paginaweb/` / `paginaweb-seven-mu.vercel.app`) con la aplicación móvil **Android** (`app/`), identificando componentes, secciones y pantallas presentes en la web pero ausentes en la app móvil.

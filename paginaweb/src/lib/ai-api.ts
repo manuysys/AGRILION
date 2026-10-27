@@ -91,10 +91,11 @@ export interface HealthResponse {
 const AI_PROXY_BASE = '/api/ai';
 const AI_SERVER_BASE = `${process.env.AI_API_URL || 'http://localhost:8000'}/api/v1`;
 
-function requestOptions(timeoutMs = 8000): RequestInit {
+function requestOptions(timeoutMs = 8000, token?: string | null): RequestInit {
   return {
     cache: 'no-store',
     signal: AbortSignal.timeout(timeoutMs),
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   };
 }
 
@@ -123,9 +124,9 @@ export async function checkHealth(): Promise<HealthResponse | null> {
 /**
  * Obtener overview de todos los silos (datos reales desde InfluxDB).
  */
-export async function getSilosOverview(): Promise<SiloOverview[]> {
+export async function getSilosOverview(token?: string | null): Promise<SiloOverview[]> {
   try {
-    const res = await fetch(apiUrl('/silos/overview'), requestOptions());
+    const res = await fetch(apiUrl('/silos/overview'), requestOptions(8000, token));
     if (!res.ok) {
       console.warn(`AI API overview failed: ${res.status}`);
       return [];
@@ -143,10 +144,14 @@ export async function getSilosOverview(): Promise<SiloOverview[]> {
  */
 export async function getSiloHistory(
   siloId: string,
-  hours: number = 24
+  hours: number = 24,
+  token?: string | null
 ): Promise<SiloHistoryPoint[]> {
   try {
-    const res = await fetch(apiUrl(`/silos/${siloId}/history?hours=${hours}`), requestOptions());
+    const res = await fetch(
+      apiUrl(`/silos/${siloId}/history?hours=${hours}`),
+      requestOptions(8000, token)
+    );
     if (!res.ok) {
       console.warn(`AI API history failed: ${res.status}`);
       return [];
@@ -163,10 +168,14 @@ export async function getSiloHistory(
  * Obtener estado actual de un silo.
  */
 export async function getSiloCurrent(
-  siloId: string
+  siloId: string,
+  token?: string | null
 ): Promise<SiloOverview | null> {
   try {
-    const res = await fetch(apiUrl(`/silos/${siloId}/current`), requestOptions());
+    const res = await fetch(
+      apiUrl(`/silos/${siloId}/current`),
+      requestOptions(8000, token)
+    );
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -184,7 +193,8 @@ export async function getSiloCurrent(
 export async function sendChatMessage(
   message: string,
   siloId?: string,
-  sessionId?: string
+  sessionId?: string,
+  token?: string | null
 ): Promise<ChatResponse | null> {
   try {
     const payload: Record<string, string> = {
@@ -196,7 +206,10 @@ export async function sendChatMessage(
 
     const res = await fetch(apiUrl('/chat'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify(payload),
     });
 
@@ -216,11 +229,13 @@ export async function sendChatMessage(
  * Generar resumen natural de un silo.
  */
 export async function summarizeSilo(
-  siloId: string
+  siloId: string,
+  token?: string | null
 ): Promise<ChatResponse | null> {
   try {
     const res = await fetch(apiUrl(`/chat/summarize/${siloId}`), {
       method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
     if (!res.ok) return null;
     return await res.json();
@@ -253,11 +268,13 @@ export async function ingestReading(
  * Limpiar sesión de chat.
  */
 export async function clearChatSession(
-  sessionId: string
+  sessionId: string,
+  token?: string | null
 ): Promise<boolean> {
   try {
     const res = await fetch(apiUrl(`/chat/session/${sessionId}`), {
       method: 'DELETE',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
     return res.ok;
   } catch {

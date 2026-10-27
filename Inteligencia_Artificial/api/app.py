@@ -73,6 +73,17 @@ app.add_middleware(
 app.include_router(router, prefix="/api/v1")
 
 
+@app.middleware("http")
+async def security_headers(request, call_next):
+    """Headers básicos de endurecimiento para la API."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.get("/", tags=["Root"])
 async def root():
     """Endpoint raíz con información de la API."""

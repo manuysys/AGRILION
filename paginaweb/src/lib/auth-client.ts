@@ -51,9 +51,45 @@ export function generateSiloId(): string {
   return `SB-${random}`;
 }
 
+export async function getCurrentIdToken(forceRefresh = false): Promise<string | null> {
+  if (!auth) return null;
+  try {
+    // En una navegación completa Firebase puede estar restaurando la sesión
+    // desde localStorage; esperar antes de decidir que no hay usuario.
+    await auth.authStateReady();
+    if (!auth.currentUser) return null;
+    return await auth.currentUser.getIdToken(forceRefresh);
+  } catch {
+    return null;
+  }
+}
+
+export async function establishServerSession(user?: User | null): Promise<void> {
+  const current = user ?? auth?.currentUser;
+  if (!current) throw new Error('No hay una sesión de Firebase activa');
+  const idToken = await current.getIdToken();
+  const res = await fetch('/api/auth/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+    credentials: 'same-origin',
+  });
+  if (!res.ok) {
+    throw new Error('No se pudo establecer la sesión segura del dashboard');
+  }
+}
+
+export async function clearServerSession(): Promise<void> {
+  await fetch('/api/auth/session', {
+    method: 'DELETE',
+    credentials: 'same-origin',
+  }).catch(() => undefined);
+}
+
 export async function signInWithEmail(email: string, password: string): Promise<User> {
   const { auth } = ensureFirebase();
   const credential = await signInWithEmailAndPassword(auth, email, password);
+  await establishServerSession(credential.user);
   return credential.user;
 }
 
@@ -62,6 +98,7 @@ export async function signInWithGoogle(): Promise<User> {
   const provider = new GoogleAuthProvider();
   const credential = await signInWithPopup(auth, provider);
   await ensureUserProfile(credential.user);
+  await establishServerSession(credential.user);
   return credential.user;
 }
 
@@ -80,6 +117,7 @@ export async function registerWithEmail(data: RegisterData): Promise<User> {
     company: data.company ?? "",
     silosEstimate: data.silosEstimate ?? "",
   });
+  await establishServerSession(user);
 
   return user;
 }
@@ -105,6 +143,7 @@ export async function ensureUserProfile(
 
 export async function signOutUser(): Promise<void> {
   const { auth } = ensureFirebase();
+  await clearServerSession();
   await signOut(auth);
 }
 
@@ -147,9 +186,15 @@ export async function registerSensorViaApi(
   deviceId: string,
   battery = 100
 ): Promise<void> {
+  const token = await getCurrentIdToken();
+  if (!token) throw new Error('Sesión vencida. Volvé a iniciar sesión.');
+
   const res = await fetch(`/api/ai/users/${uid}/silos/${siloId}/sensors`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify({ device_id: deviceId, battery }),
   });
 

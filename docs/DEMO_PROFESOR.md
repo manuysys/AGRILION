@@ -11,6 +11,7 @@ Las placas se desconectaron después de juntar datos. Por eso:
 - La app Android hace lo mismo: marca el silo como `Sin datos` y muestra la
   antigüedad de la última lectura.
 - El mapa real queda sin marcadores si no hubo fix GPS.
+- El dashboard real exige login; el modo demo es público.
 - Para mostrar todas las funciones sin hardware está el **modo demostración**:
   6 silobolsas simuladas, estados variados y coordenadas de ejemplo.
 
@@ -115,10 +116,10 @@ mostrar un falso “online”.
 ### 3. Dashboard real / estado offline (1–2 min)
 
 - Abrir la versión real.
+- Iniciar sesión con la cuenta dueña de `SB-E2E01`.
 - Mostrar el aviso de datos antiguos y la última lectura.
-- Explicar la diferencia entre “sin datos” y “0 ppm” (CO₂ se muestra como
-  “Sin dato” cuando el sensor no entrega medición).
-- Mostrar el detalle con histórico.
+- Explicar que la API filtra por usuario: esa cuenta solo ve sus silos.
+- Mostrar el detalle con histórico y, si está disponible, predicción LSTM.
 
 ### 4. Arquitectura y hardware (1–2 min)
 
@@ -131,8 +132,10 @@ mostrar un falso “online”.
 ### 5. Cierre (1 min)
 
 - Logros: monitoreo en tiempo real, histórico, riesgo, IA, mapa, app y web.
-- Limitaciones: CO₂ del SCD4x, GPS sin fix real, frecuencia de 20 s para pruebas,
-  autenticación de la API pendiente.
+- Seguridad: dashboard con sesión, API con Firebase ID token, filtrado por
+  propietario e ingesta interna con clave.
+- Limitaciones: GPS sin fix real, frecuencia de 20 s para pruebas y dependencia
+  del túnel para el deploy real.
 - Próximos pasos: reconectar placa, ajustar duty cycle del GPS y desplegar el
   backend sin depender del túnel local.
 
@@ -143,7 +146,7 @@ mostrar un falso “online”.
 | Temperatura | 18.3–24.0 °C | Plausible; puede subir por autocalentamiento |
 | Humedad ambiente | 61.6–70.3 % RH | No es humedad del grano |
 | Presión | ~1019–1021 hPa | Viaja en el payload, no se grafica |
-| CO₂ | 0 → “Sin dato” | Sensor no entrega medición |
+| CO₂ | ~980 ppm | Lecturas reales del SCD41 en modo periódico; si falla se muestra “Sin dato” |
 | Aceleración normal | 0.6–1.0 m/s² | Ruido/vibración normal |
 | Impactos | ~9.8 m/s² | Score 35/WARNING en esa lectura |
 | GPS | Sin fix | `sats=0`, HDOP 25.5 bajo techo |
@@ -161,7 +164,12 @@ mostrar un falso “online”.
 
 ## Seguridad
 
-- No mostrar `.env`, tokens de TTN/HiveMQ/Influx ni la service account de
-  Firebase.
-- La URL real es pública; no subir credenciales al repositorio.
+- El dashboard real exige login de Firebase; sin sesión redirige a `/login`.
+- La API valida el ID token y filtra los silos por usuario. La app Android envía
+  el mismo token automáticamente.
+- `/api/v1/ingest` exige `X-Ingest-Key`; el frontend no conoce esa clave.
+- No mostrar `.env`, tokens de TTN/HiveMQ/Influx, `INGEST_API_KEY` ni la service
+  account de Firebase.
+- La URL real es pública, pero los datos requieren sesión; no subir credenciales
+  al repositorio.
 - Al terminar, detener `cloudflared` para cerrar el túnel público.

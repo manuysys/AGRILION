@@ -1,12 +1,9 @@
-import { fetchSiloDetail, fetchSilobags } from '@/lib/data-service';
+import { fetchSiloDetail } from '@/lib/data-service';
 import { notFound } from 'next/navigation';
 import SiloDetailClient from '@/components/dashboard/silo-detail-client';
 
-// Generate static params for all silos
-export async function generateStaticParams() {
-  const silos = await fetchSilobags();
-  return silos.map((silo) => ({ id: silo.id }));
-}
+// La ruta depende de la sesión del usuario; se renderiza en cada request.
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

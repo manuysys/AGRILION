@@ -1,3 +1,6 @@
+> [!NOTE]
+> Documento histórico de diseño. El estado vigente está en README.md y docs/.
+
 # 🚀 Guía de Despliegue de Agrilion
 
 Este documento describe cómo desplegar el sistema completo de Agrilion usando Docker.

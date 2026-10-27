@@ -92,7 +92,13 @@ registrar `com.example.app1` → descargar `google-services.json` → guardarlo 
 
 ---
 
-## 5. Verificación final
+## 5. Clave interna de ingesta
+
+`INGEST_API_KEY` protege `POST /api/v1/ingest`. Debe existir con el mismo valor
+en `Inteligencia_Artificial/.env` y `Backend_Arduino/.env`; el bridge MQTT→IA la
+envía en `X-Ingest-Key`. No se expone en el frontend ni en la app.
+
+## 6. Verificación final
 
 ```bash
 python scripts/check_env.py      # TTN, HiveMQ, Influx, web

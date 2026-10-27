@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { History, Loader2 } from 'lucide-react';
 import type { SiloBag, SensorReading } from '@/types';
 import TimelineChart from '@/components/ui/timeline-chart';
+import { getCurrentIdToken } from '@/lib/auth-client';
 
 interface HistoryClientProps {
   silos: SiloBag[];
@@ -13,6 +14,7 @@ interface HistoryClientProps {
 export default function HistoryClient({ silos }: HistoryClientProps) {
   const [selectedSilo, setSelectedSilo] = useState(silos[0]?.id ?? '');
   const [selectedMetric, setSelectedMetric] = useState<'temperature' | 'humidity' | 'co2' | 'pressure'>('temperature');
+  const [hours, setHours] = useState(24);
   const [readings, setReadings] = useState<SensorReading[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,13 +37,31 @@ export default function HistoryClient({ silos }: HistoryClientProps) {
         return;
       }
 
+      const isDemo = process.env.NEXT_PUBLIC_MOCK_MODE !== 'false';
+      if (isDemo) {
+        setReadings(silo?.readings24h ?? []);
+        setLoading(false);
+        setError(null);
+        return;
+      }
+
+      const token = await getCurrentIdToken();
+      if (!token) {
+        setLoading(false);
+        setError('Sesión vencida. Volvé a iniciar sesión.');
+        return;
+      }
+
       setLoading(true);
       setError(null);
 
       try {
         const res = await fetch(
-          `/api/ai/silos/${encodeURIComponent(selectedSilo)}/history?hours=24`,
-          { signal: controller.signal }
+          `/api/ai/silos/${encodeURIComponent(selectedSilo)}/history?hours=${hours}`,
+          {
+            signal: controller.signal,
+            headers: { Authorization: `Bearer ${token}` },
+          }
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
@@ -71,7 +91,7 @@ export default function HistoryClient({ silos }: HistoryClientProps) {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [selectedSilo]);
+  }, [selectedSilo, hours, silo?.readings24h]);
 
   return (
     <motion.div
@@ -108,6 +128,23 @@ export default function HistoryClient({ silos }: HistoryClientProps) {
               {s.id} — {s.name}
             </option>
           ))}
+        </select>
+
+        {/* Time range */}
+        <select
+          value={hours}
+          onChange={(e) => setHours(Number(e.target.value))}
+          aria-label="Rango de tiempo"
+          className="
+            px-4 py-2.5 rounded-xl border border-white/10
+            bg-zinc-900/60 backdrop-blur-xl text-sm text-white
+            cursor-pointer focus:border-emerald-500/50
+            outline-none transition-colors
+          "
+        >
+          <option value={24} className="bg-zinc-900 text-white">24 h</option>
+          <option value={168} className="bg-zinc-900 text-white">7 días</option>
+          <option value={720} className="bg-zinc-900 text-white">30 días</option>
         </select>
 
         {/* Metric selector */}

@@ -6,9 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Agrilion** is an IoT system for real-time monitoring of grain stored in silobolsas (agricultural silo bags). It detects deterioration risk (humidity, temperature, CO₂) before economic loss occurs. The repo holds multiple independent subsystems that together form the demo described in `DEMO_SCRIPT.md`:
 
-- Hardware sensors (BME280) → LoRa → TTN MQTT → Arduino/Python backend
+- Hardware sensors (SHT30, BME280, SCD4x, ADXL345) + GPS Air530Z → LoRaWAN → TTN
+  MQTT → Python backend
 - Python ML pipeline (LSTM forecasting, anomaly detection, risk engine) exposed as FastAPI
-- Next.js web app (landing page + dashboard) with mock-data mode
+- Next.js web app (landing + authenticated dashboard) and Android app, with demo mode
 
 The root is **not** a single project — each subsystem has its own toolchain. Run them from their own directories.
 
@@ -80,14 +81,14 @@ python main.py            # launcher: runs the 3 bridges in parallel
 
 **Front-end data layer** (`paginaweb/src/lib/`):
 - `ai-api.ts` — typed client for the Python AI API (via Next.js rewrites).
-- `data-service.ts` — domain functions (`fetchDashboardStats`, `fetchSilobags`, `fetchSiloDetail`, `fetchAlerts`) consumed by pages. `NEXT_PUBLIC_MOCK_MODE=false` calls the API, then falls back to mock on any failure.
-- `mock-data.ts` — static demo dataset used as fallback.
+- `data-service.ts` — domain functions (`fetchDashboardStats`, `fetchSilobags`, `fetchSiloDetail`, `fetchAlerts`) consumed by pages. En modo real llama a la API con el Firebase ID token de la cookie httpOnly; si falla, devuelve vacío y la UI muestra el aviso (no inventa datos).
+- `mock-data.ts` — dataset simulado usado solo cuando `NEXT_PUBLIC_MOCK_MODE=true`.
 
 **ML pipeline** (`Inteligencia_Artificial/src/`): `data_loader` → `preprocessing` (24-step window) → `lstm_model` (2-layer LSTM, 3-feature output) → `predictor`. `anomaly_detection.py` runs Z-Score + Moving Average + Isolation Forest and requires ≥2/3 consensus. `risk_engine.py` scores 0–100 with weights humidity+temp 30%, CO₂ 25%, anomalies 20%, LSTM deviation 25%. `alerts.py` produces Spanish-language messages.
 
-**API routing** in `paginaweb`: Next.js rewrites in `next.config.ts` map `/api/backend/*` → `BACKEND_URL` (default `http://localhost:8000`) and `/api/ml/*` → `ML_URL/api/v1/*` (default `http://localhost:8001`). The ML path uses the `/api/v1` prefix on the FastAPI side; the backend Arduino service does not. `.env.local` ships with `NEXT_PUBLIC_MOCK_MODE=true` so the dashboard works without any backend running.
+**API routing** in `paginaweb`: Next.js rewrites in `next.config.ts` map `/api/ai/*` → `AI_API_URL/api/v1/*`. El dashboard real se renderiza en el servidor, lee el ID token desde una cookie httpOnly y lo envía como `Authorization: Bearer`. La API verifica Firebase, filtra los silos por propietario y exige `X-Ingest-Key` en `/ingest`.
 
-**Demo mode** is the default state of this repo: with `NEXT_PUBLIC_MOCK_MODE=true`, the Next.js app uses `mock-data.ts` and the Arduino/ML services are not required. The "DEMO" badge in the dashboard header signals this state.
+**Modo demo:** con `NEXT_PUBLIC_MOCK_MODE=true`, el Next.js app usa `mock-data.ts`, muestra un banner de demostración y no requiere login. El dashboard real requiere login y no cae a mock si la API falla.
 
 ## Conventions
 

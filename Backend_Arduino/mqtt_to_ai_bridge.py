@@ -89,13 +89,20 @@ def send_to_ai_api(payload: dict) -> dict | None:
         Response JSON de la API, o None si falla.
     """
     url = f"{AI_API_URL}/ingest"
+    ingest_key = os.getenv("INGEST_API_KEY", "").strip()
+    headers = {"Content-Type": "application/json"}
+    if ingest_key:
+        headers["X-Ingest-Key"] = ingest_key
+    else:
+        logger.error("INGEST_API_KEY no configurada; /ingest rechazará la lectura")
+        return None
 
     try:
         response = requests.post(
             url,
             json=payload,
             timeout=AI_API_TIMEOUT,
-            headers={"Content-Type": "application/json"},
+            headers=headers,
         )
 
         if response.status_code == 200:

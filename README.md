@@ -43,12 +43,20 @@ Sensores SHT30 / BME280 / ADXL345 / SCD4x
 - Detección de sensores sin datos recientes (más de 6 h).
 - Modo demostración con seis silobolsas simuladas y coordenadas de ejemplo.
 - Chat con IA y fallback por reglas.
+- Dashboard real protegido con sesión de Firebase; la API filtra cada usuario
+  por sus propios silos.
+- Ingesta interna protegida con `INGEST_API_KEY`; el frontend nunca la recibe.
 
 ## Demo
 
 - **Mock web:** https://paginaweb-seven-mu.vercel.app/dashboard
-- **Real:** https://agrilion-live.vercel.app/dashboard (requiere túnel y API local)
+- **Real:** https://agrilion-live.vercel.app/dashboard (requiere login, túnel y API local)
 - **Guía de presentación:** `docs/DEMO_PROFESOR.md`
+
+El modo demo es público y usa datos simulados. El dashboard real exige una
+sesión de Firebase; cada usuario ve únicamente sus silos. El formulario de
+login/registro crea una cookie httpOnly con el ID token para que el servidor
+pueda consultar la API sin exponer el token al JavaScript de la página.
 
 Modo demo local:
 
@@ -74,6 +82,10 @@ uvicorn api.app:app --host 0.0.0.0 --port 8000
 
 La API queda documentada en `http://localhost:8000/docs`. Los puentes de TTN,
 InfluxDB y Firebase se describen en `Backend_Arduino/` y en la guía de demo.
+
+Configurá la misma `INGEST_API_KEY` en `Inteligencia_Artificial/.env` y en
+`Backend_Arduino/.env`. La API la exige en `X-Ingest-Key`; sin esa clave el
+endpoint de ingesta responde 401/503.
 
 ## App Android
 
@@ -107,18 +119,20 @@ Detalles de alimentación, payload y GPS: README del sketch y
 
 ## Estado y limitaciones
 
-- El SCD4x se identifica como SCD40 y no entrega una medición válida de CO₂; se
-  muestra “Sin dato”, no 0 ppm.
+- El SCD4x usa medición periódica y entrega CO₂ real (alrededor de 980 ppm en
+  las últimas lecturas). Si no hay una medición válida, el frontend muestra
+  “Sin dato”, no 0 ppm.
 - El GPS no logró un fix real bajo techo. Necesita vista al cielo o antena
   externa.
 - La frecuencia de transmisión está en 20 s para pruebas; en producción conviene
   aumentarla para ahorrar batería.
-- `/api/v1/silos/overview` todavía no filtra por usuario; la autenticación y
-  autorización por propietario quedan como deuda para producción.
-- La versión real de Vercel depende del túnel a la API local.
+- La versión real de Vercel depende del túnel a la API local; el mock es
+  independiente.
+- La app debug permite HTTP local; la build release exige HTTPS.
 
 ## Documentación
 
+- `docs/SEGURIDAD.md`
 - `docs/DEMO_PROFESOR.md`
 - `docs/GPS_INTEGRACION.md`
 - `docs/ANDROID_INTEGRACION.md`

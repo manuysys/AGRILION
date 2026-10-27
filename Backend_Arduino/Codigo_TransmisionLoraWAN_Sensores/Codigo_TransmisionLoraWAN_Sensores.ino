@@ -56,7 +56,7 @@ float    gpsHdop         = 0.0;
 
 #define PIN_INTERRUPCION GPIO5
 
-// CO2 (SCD41): el sensor responde correctamente en modo single-shot.
+// CO2 (SCD4x): medición periódica después del join.
 // Se habilita para enviar CO2 real en el payload.
 #define AGRILION_CO2 1
 
@@ -246,9 +246,8 @@ void prepareTxFrame(uint8_t port)
     aceleracionGuardada = 0;
   }
 
-  // ================== CO2 (SCD41) ==================
-  // Modo single-shot: hay que esperar ~5s a que el dato esté listo.
-  // La librería devuelve TRUE cuando hay medición fresca (ver Example8).
+  // ================== CO2 (SCD4x) ==================
+  // Medición periódica: la librería devuelve true cuando hay dato fresco.
   uint16_t co2 = last_co2;
 #if AGRILION_CO2
   // Inicialización diferida después del join. El sensor queda encendido

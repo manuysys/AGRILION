@@ -1,6 +1,7 @@
 package com.example.app1.data
 
 import android.content.Context
+import kotlinx.coroutines.runBlocking
 import okhttp3.HttpUrl
 import okhttp3.Interceptor
 
@@ -89,5 +90,24 @@ object ApiConfig {
             .build()
 
         chain.proceed(request.newBuilder().url(newUrl).build())
+    }
+
+    /**
+     * Adjunta el Firebase ID token a cada request. La API lo exige para
+     * overview, histórico, predicción y chat. El health check es público,
+     * pero tolera el header.
+     */
+    fun firebaseAuthInterceptor(): Interceptor = Interceptor { chain ->
+        val token = runBlocking {
+            runCatching { AuthManager.getInstance().getIdToken() }.getOrNull()
+        }
+        val request = if (!token.isNullOrBlank()) {
+            chain.request().newBuilder()
+                .header("Authorization", "Bearer $token")
+                .build()
+        } else {
+            chain.request()
+        }
+        chain.proceed(request)
     }
 }

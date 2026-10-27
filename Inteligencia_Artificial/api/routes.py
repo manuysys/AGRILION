@@ -16,7 +16,7 @@ from typing import Optional
 from pathlib import Path
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from starlette.concurrency import run_in_threadpool
 
 from .schemas import (
@@ -54,6 +54,13 @@ from src.services.ai_service import AIService, InMemoryRepository, SensorReading
 from src.chatbot import ChatbotService, LLMConfig, FallbackClient
 from src.services.influx_repository import create_repository_from_env, InfluxRepository
 from src.services.firebase_service import get_firebase_service
+from .security import (
+    get_current_user,
+    require_ingest_key,
+    require_same_user,
+    require_silo_access,
+    user_silo_ids,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +173,7 @@ async def health_check():
 
 
 @router.get("/model/status", response_model=ModelStatusResponse, tags=["Modelo"])
-async def model_status():
+async def model_status(_user: dict = Depends(get_current_user)):
     """Devuelve información sobre el modelo cargado."""
     if _model is None or _model.model is None:
         return ModelStatusResponse(
@@ -183,7 +190,7 @@ async def model_status():
 
 
 @router.post("/predict", response_model=PredictionResponse, tags=["Predicción"])
-async def predict(request: PredictionRequest):
+async def predict(request: PredictionRequest, _user: dict = Depends(get_current_user)):
     """
     Predice valores futuros de sensores.
 
@@ -249,7 +256,7 @@ async def predict(request: PredictionRequest):
 
 
 @router.post("/analyze", response_model=AnalysisResponse, tags=["Análisis"])
-async def analyze(request: AnalysisRequest):
+async def analyze(request: AnalysisRequest, _user: dict = Depends(get_current_user)):
     """
     Análisis completo: anomalías + riesgo + alertas.
 
@@ -357,7 +364,10 @@ async def analyze(request: AnalysisRequest):
 
 
 @router.post("/ingest", response_model=IngestResponse, tags=["Tiempo Real"])
-async def ingest_sensor_reading(request: IngestRequest):
+async def ingest_sensor_reading(
+    request: IngestRequest,
+    _ingest_key: None = Depends(require_ingest_key),
+):
     """
     Endpoint de ingestión de sensores en tiempo real.
 
@@ -419,7 +429,7 @@ async def ingest_sensor_reading(request: IngestRequest):
 # ===========================================================================
 
 @router.post("/chat", response_model=ChatResponse, tags=["Chatbot"])
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, user: dict = Depends(get_current_user)):
     """
     Intelligent chatbot endpoint.
 
@@ -431,15 +441,23 @@ async def chat(request: ChatRequest):
     if _chatbot is None:
         raise HTTPException(status_code=503, detail="Chatbot not initialized")
 
-    # Si el usuario no eligió un silo, usar el de mayor riesgo como contexto.
+    # El contexto del chat solo puede incluir silos del usuario autenticado.
+    allowed = user_silo_ids(str(user["uid"]))
     overview = []
     if _influx_repo is not None:
         try:
-            overview = _influx_repo.get_silo_overview()
+            overview = [
+                silo
+                for silo in _influx_repo.get_silo_overview()
+                if str(silo.get("silo_id")) in allowed
+            ]
         except Exception as e:
             logger.warning(f"No se pudo obtener overview para el chat: {e}")
 
     silo_id = request.silo_id
+    if silo_id and silo_id not in allowed:
+        raise HTTPException(status_code=404, detail="Silo no encontrado")
+
     if not silo_id and overview:
         # Si el mensaje menciona un silo concreto, usarlo.
         text = (request.message or "").lower()
@@ -475,10 +493,11 @@ async def chat(request: ChatRequest):
 
 
 @router.post("/chat/summarize/{silo_id}", response_model=ChatResponse, tags=["Chatbot"])
-async def summarize_silo(silo_id: str):
+async def summarize_silo(silo_id: str, user: dict = Depends(get_current_user)):
     """
     Generate a natural-language status summary for a silo.
     """
+    require_silo_access(str(user["uid"]), silo_id)
     if _chatbot is None:
         raise HTTPException(status_code=503, detail="Chatbot not initialized")
     result = _chatbot.summarize_silo(silo_id)
@@ -486,10 +505,15 @@ async def summarize_silo(silo_id: str):
 
 
 @router.post("/chat/explain-alert", response_model=ChatResponse, tags=["Chatbot"])
-async def explain_alert(alert: dict, silo_id: str = "SILO_001"):
+async def explain_alert(
+    alert: dict,
+    silo_id: str = "SILO_001",
+    user: dict = Depends(get_current_user),
+):
     """
     Get a natural-language explanation of a specific alert.
     """
+    require_silo_access(str(user["uid"]), silo_id)
     if _chatbot is None:
         raise HTTPException(status_code=503, detail="Chatbot not initialized")
     result = _chatbot.explain_alert(alert, silo_id=silo_id)
@@ -497,7 +521,10 @@ async def explain_alert(alert: dict, silo_id: str = "SILO_001"):
 
 
 @router.delete("/chat/session/{session_id}", tags=["Chatbot"])
-async def clear_chat_session(session_id: str):
+async def clear_chat_session(
+    session_id: str,
+    _user: dict = Depends(get_current_user),
+):
     """Clear conversation memory for a session."""
     if _chatbot:
         _chatbot.clear_session(session_id)
@@ -510,20 +537,33 @@ async def clear_chat_session(session_id: str):
 
 
 @router.get("/silos/overview", response_model=SilosOverviewResponse, tags=["Datos"])
-async def get_silos_overview():
+async def get_silos_overview(user: dict = Depends(get_current_user)):
     """
-    Devuelve el estado actual de todos los silos.
+    Devuelve el estado actual de los silos del usuario autenticado.
 
     Usa datos reales de InfluxDB si está configurado, o
     datos del InMemoryRepository si no.
     """
+    allowed = user_silo_ids(str(user["uid"]))
     if _influx_repo is not None:
-        raw = _influx_repo.get_silo_overview()
+        raw = [
+            silo
+            for silo in _influx_repo.get_silo_overview()
+            if str(silo.get("silo_id")) in allowed
+        ]
     elif _repository is not None and hasattr(_repository, "get_silo_overview"):
-        raw = _repository.get_silo_overview()
+        raw = [
+            silo
+            for silo in _repository.get_silo_overview()
+            if str(silo.get("silo_id")) in allowed
+        ]
     else:
         # Fallback: generar datos de prueba
-        raw = _generate_mock_overview()
+        raw = [
+            silo
+            for silo in _generate_mock_overview()
+            if str(silo.get("silo_id")) in allowed
+        ]
 
     silos = [
         SiloOverviewItem(
@@ -560,10 +600,17 @@ async def get_silos_overview():
     response_model=SiloHistoryResponse,
     tags=["Datos"],
 )
-async def get_silo_history(silo_id: str, hours: int = 24):
+async def get_silo_history(
+    silo_id: str,
+    hours: int = 24,
+    user: dict = Depends(get_current_user),
+):
     """
     Devuelve el historial de un silo en las últimas N horas.
     """
+    if hours < 1 or hours > 720:
+        raise HTTPException(status_code=422, detail="hours debe estar entre 1 y 720")
+    require_silo_access(str(user["uid"]), silo_id)
     if _influx_repo is not None:
         raw = _influx_repo.get_silo_history(silo_id, hours)
     elif _repository is not None and hasattr(_repository, "get_recent_readings"):
@@ -600,11 +647,12 @@ async def get_silo_history(silo_id: str, hours: int = 24):
 
 
 @router.get("/silos/{silo_id}/prediction", tags=["Datos"])
-async def get_silo_prediction(silo_id: str):
+async def get_silo_prediction(silo_id: str, user: dict = Depends(get_current_user)):
     """
     Predicción LSTM + anomalías + riesgo para un silo, usando el histórico
     real de InfluxDB sin volver a escribir la lectura.
     """
+    require_silo_access(str(user["uid"]), silo_id)
     if _model is None or _preprocessor is None or _predictor is None:
         raise HTTPException(status_code=503, detail="Modelo LSTM no disponible")
     if _influx_repo is None:
@@ -676,10 +724,11 @@ async def get_silo_prediction(silo_id: str):
 
 
 @router.get("/silos/{silo_id}/current", tags=["Datos"])
-async def get_silo_current(silo_id: str):
+async def get_silo_current(silo_id: str, user: dict = Depends(get_current_user)):
     """
     Devuelve el estado actual de un silo específico.
     """
+    require_silo_access(str(user["uid"]), silo_id)
     if _influx_repo is not None:
         all_silos = _influx_repo.get_silo_overview()
         for s in all_silos:
@@ -767,7 +816,7 @@ async def verify_token(request: dict):
 
 
 @router.get("/users/{uid}/silos", tags=["Silos"])
-async def get_user_silos(uid: str):
+async def get_user_silos(uid: str, _user: dict = Depends(require_same_user)):
     """Devuelve todos los silos de un usuario."""
     fb = get_firebase_service()
     if not fb:
@@ -778,7 +827,7 @@ async def get_user_silos(uid: str):
 
 
 @router.post("/users/{uid}/silos", tags=["Silos"])
-async def create_silo(uid: str, request: dict):
+async def create_silo(uid: str, request: dict, _user: dict = Depends(require_same_user)):
     """
     Crea una nueva silobolsa para un usuario.
     
@@ -808,7 +857,7 @@ async def create_silo(uid: str, request: dict):
 
 
 @router.get("/users/{uid}/silos/{silo_id}", tags=["Silos"])
-async def get_silo(uid: str, silo_id: str):
+async def get_silo(uid: str, silo_id: str, _user: dict = Depends(require_same_user)):
     """Devuelve un silo específico con sus sensores."""
     fb = get_firebase_service()
     if not fb:
@@ -822,7 +871,12 @@ async def get_silo(uid: str, silo_id: str):
 
 
 @router.post("/users/{uid}/silos/{silo_id}/sensors", tags=["Sensores"])
-async def register_sensor(uid: str, silo_id: str, request: dict):
+async def register_sensor(
+    uid: str,
+    silo_id: str,
+    request: dict,
+    _user: dict = Depends(require_same_user),
+):
     """
     Registra un sensor y lo asocia a un silo.
     
@@ -835,6 +889,18 @@ async def register_sensor(uid: str, silo_id: str, request: dict):
     fb = get_firebase_service()
     if not fb:
         raise HTTPException(status_code=503, detail="Firebase no disponible")
+    if not fb.get_silo(uid, silo_id):
+        raise HTTPException(status_code=404, detail="Silo no encontrado")
+
+    existing = fb.get_sensor_info(request["device_id"])
+    if existing and (
+        str(existing.get("ownerUid")) != str(uid)
+        or str(existing.get("siloId")) != str(silo_id)
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Ese device_id ya está asociado a otro usuario o silo",
+        )
     
     try:
         sensor_id = fb.register_sensor(
@@ -849,21 +915,25 @@ async def register_sensor(uid: str, silo_id: str, request: dict):
 
 
 @router.get("/sensors/{device_id}", tags=["Sensores"])
-async def get_sensor_info(device_id: str):
-    """Obtiene info de un sensor por device_id (lookup global)."""
+async def get_sensor_info(device_id: str, user: dict = Depends(get_current_user)):
+    """Obtiene info de un sensor propio por device_id."""
     fb = get_firebase_service()
     if not fb:
         raise HTTPException(status_code=503, detail="Firebase no disponible")
     
     info = fb.get_sensor_info(device_id)
-    if not info:
+    if not info or str(info.get("ownerUid")) != str(user["uid"]):
         raise HTTPException(status_code=404, detail="Sensor no encontrado")
     
     return {"status": "ok", "sensor": info}
 
 
 @router.get("/users/{uid}/alerts", tags=["Alertas"])
-async def get_user_alerts(uid: str, acknowledged: bool = None):
+async def get_user_alerts(
+    uid: str,
+    acknowledged: bool = None,
+    _user: dict = Depends(require_same_user),
+):
     """Devuelve las alertas de un usuario."""
     fb = get_firebase_service()
     if not fb:
@@ -874,7 +944,11 @@ async def get_user_alerts(uid: str, acknowledged: bool = None):
 
 
 @router.post("/users/{uid}/alerts/{alert_id}/acknowledge", tags=["Alertas"])
-async def acknowledge_alert(uid: str, alert_id: str):
+async def acknowledge_alert(
+    uid: str,
+    alert_id: str,
+    _user: dict = Depends(require_same_user),
+):
     """Marca una alerta como reconocida."""
     fb = get_firebase_service()
     if not fb:

@@ -155,9 +155,22 @@ class IngestResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     """Request para el chatbot de IA."""
-    message: str = Field(..., min_length=1, description="Pregunta del usuario")
-    silo_id: Optional[str] = Field(default=None, description="ID del silo para contexto (opcional)")
-    session_id: str = Field(default="default", description="ID de sesión para mantener conversación")
+    message: str = Field(
+        ...,
+        min_length=1,
+        max_length=4000,
+        description="Pregunta del usuario",
+    )
+    silo_id: Optional[str] = Field(
+        default=None,
+        max_length=128,
+        description="ID del silo para contexto (opcional)",
+    )
+    session_id: str = Field(
+        default="default",
+        max_length=128,
+        description="ID de sesión para mantener conversación",
+    )
 
 
 class ChatResponse(BaseModel):

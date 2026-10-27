@@ -111,9 +111,10 @@ service cloud.firestore {
       }
     }
 
-    // Lookup global de sensores: lectura autenticada, escritura solo backend
+    // Lookup global de sensores: solo el dueño puede leer; escritura solo backend
     match /sensors/{deviceId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null
+                  && resource.data.ownerUid == request.auth.uid;
       allow write: if false;
     }
   }

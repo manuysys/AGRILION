@@ -7,6 +7,7 @@ import type { SiloBag, Alert } from '@/types';
 import RiskGauge from '@/components/ui/risk-gauge';
 import StatusPill from '@/components/ui/status-pill';
 import { sendChatMessage, type ChatResponse } from '@/lib/ai-api';
+import { getCurrentIdToken } from '@/lib/auth-client';
 
 interface IAClientProps {
   silos: SiloBag[];
@@ -148,9 +149,17 @@ export default function IAClient({ silos, alerts }: IAClientProps) {
     if (!siloId) return;
 
     let cancelled = false;
+    const headers = async () => {
+      const token = await getCurrentIdToken();
+      return token ? { Authorization: `Bearer ${token}` } : undefined;
+    };
     Promise.all([
-      fetch(`/api/ai/silos/${encodeURIComponent(siloId)}/prediction`).then((r) => (r.ok ? r.json() : null)),
-      fetch('/api/ai/model/status').then((r) => (r.ok ? r.json() : null)),
+      headers().then((h) =>
+        fetch(`/api/ai/silos/${encodeURIComponent(siloId)}/prediction`, { headers: h })
+      ).then((r) => (r.ok ? r.json() : null)),
+      headers().then((h) =>
+        fetch('/api/ai/model/status', { headers: h })
+      ).then((r) => (r.ok ? r.json() : null)),
     ])
       .then(([pred, model]) => {
         if (cancelled) return;
@@ -181,10 +190,12 @@ export default function IAClient({ silos, alerts }: IAClientProps) {
     try {
       // Try the real AI API first
       if (apiConnected !== false) {
+        const token = await getCurrentIdToken();
         const apiResponse: ChatResponse | null = await sendChatMessage(
           query,
           undefined, // silo_id (optional)
-          sessionIdRef.current || 'web-dashboard'
+          sessionIdRef.current || 'web-dashboard',
+          token
         );
 
         if (apiResponse && apiResponse.response) {

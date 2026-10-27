@@ -13,6 +13,7 @@ import {
   getSiloHistory,
   type SiloOverview,
 } from './ai-api';
+import { getSessionToken } from './session-server';
 
 export const IS_DEMO_MODE = process.env.NEXT_PUBLIC_MOCK_MODE !== 'false';
 
@@ -192,8 +193,9 @@ export async function fetchSilobags(): Promise<SiloBag[]> {
     return [...mockSiloBags].sort((a, b) => b.riskScore.value - a.riskScore.value);
   }
 
-  // Modo real: si la API falla o no hay datos, se devuelve vacío (sin mock).
-  const overview = await getSilosOverview();
+  // Modo real: la cookie httpOnly contiene el Firebase ID token.
+  const token = await getSessionToken();
+  const overview = await getSilosOverview(token);
   const silos = overview.map(overviewToSiloBag);
   return silos.sort((a, b) => b.riskScore.value - a.riskScore.value);
 }
@@ -206,7 +208,8 @@ export async function fetchSiloDetail(id: string): Promise<SiloBag | null> {
 
   try {
     // Primero obtener el overview para encontrar este silo
-    const overview = await getSilosOverview();
+    const token = await getSessionToken();
+    const overview = await getSilosOverview(token);
     const siloOverview = overview.find(s => s.silo_id === id);
 
     if (!siloOverview) {
@@ -216,7 +219,7 @@ export async function fetchSiloDetail(id: string): Promise<SiloBag | null> {
     const siloBag = overviewToSiloBag(siloOverview);
 
     // Cargar historial de 24h
-    const history = await getSiloHistory(id, 24);
+    const history = await getSiloHistory(id, 24, token);
     if (history.length > 0) {
       siloBag.readings24h = history.map(h => ({
         timestamp: h.timestamp,
@@ -263,7 +266,8 @@ export async function fetchAlerts(filter?: {
   // Por ahora las alertas se generan del overview de la AI API.
   // Como fallback temporal, usamos mock alerts.
   try {
-    const overview = await getSilosOverview();
+    const token = await getSessionToken();
+    const overview = await getSilosOverview(token);
     const alerts: Alert[] = [];
     const now = new Date().toISOString();
 
