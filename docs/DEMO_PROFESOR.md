@@ -19,7 +19,7 @@ Las placas se desconectaron después de juntar datos. Por eso:
 
 | Versión | URL | Datos |
 |---------|-----|-------|
-| Real (Vercel) | https://agrilion-live.vercel.app/dashboard | Datos reales vía túnel a la API local |
+| Real (Vercel) | https://agrilion-live.vercel.app/dashboard | Datos reales vía túnel; requiere login |
 | Mock (Vercel) | https://paginaweb-seven-mu.vercel.app/dashboard | Datos sintéticos de 6 silobolsas |
 | Local | http://localhost:3000/dashboard | Real o mock según `NEXT_PUBLIC_MOCK_MODE` |
 | API IA | http://localhost:8000/docs | Documentación interactiva |
