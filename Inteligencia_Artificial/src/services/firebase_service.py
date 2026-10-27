@@ -197,7 +197,7 @@ class FirebaseService:
         """
         if not self.is_available:
             raise RuntimeError("Firebase no disponible")
-        decoded = auth.verify_id_token(id_token)
+        decoded = auth.verify_id_token(id_token, check_revoked=True)
         return decoded
 
     # ─── SILOS (Silobolsas) ──────────────────────────────────────────────────
