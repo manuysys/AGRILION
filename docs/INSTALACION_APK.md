@@ -20,24 +20,31 @@ no es el artefacto final para publicar.
 SHA-256 del APK generado:
 
 ```text
-B412CAE26BA5C63299469327557E74971C0BEBC13BACCAEB94DC8FAFCBB5ADD7
+E8E48700DC926BFD645E1E71009E53A8D65B0CA2DEC238772E023A4EEF9442D8
 ```
 
 ## Antes de instalar
 
 - Android 7.0 o superior.
-- La notebook y el teléfono en la **misma red Wi-Fi**.
-- La API de Agrilion corriendo en la notebook.
 - El teléfono con conexión a Internet para Firebase Auth.
+- La API de Agrilion corriendo en la notebook.
+- Si se usa el APK actual: el túnel HTTPS activo.
+- Si se compila para red local: notebook y teléfono en la **misma Wi-Fi**.
 
-La IP usada por defecto en este build es:
+La versión actual del APK apunta por defecto al túnel HTTPS:
 
 ```text
-http://192.168.68.50:8000/
+https://ratings-trembl-armor-sql.trycloudflare.com/
 ```
 
-Si la IP de la notebook cambia, se puede corregir desde la app:
+El túnel es temporal: si cambia, corregir la URL desde la app:
 **Configuración → Conexión API**.
+
+También se puede compilar para una red local:
+
+```powershell
+.\gradlew.bat assembleDebug -PapiBaseUrl=http://IP_DE_LA_PC:8000/
+```
 
 ## Instalar
 
