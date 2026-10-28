@@ -5,6 +5,9 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+val apiBaseUrl = providers.gradleProperty("apiBaseUrl")
+    .orElse("http://10.0.2.2:8000/")
+
 android {
     namespace = "com.example.app1"
     compileSdk = 35
@@ -16,6 +19,9 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Valor por defecto del build. Para un teléfono físico:
+        // -PapiBaseUrl=http://IP_DE_LA_PC:8000/
+        buildConfigField("String", "API_BASE_URL", "\"${apiBaseUrl.get()}\"")
     }
 
     buildTypes {
@@ -30,6 +36,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     kotlinOptions {
         jvmTarget = "11"

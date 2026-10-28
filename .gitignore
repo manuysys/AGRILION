@@ -3,6 +3,7 @@ node_modules/
 paginaweb/node_modules/
 paginaweb/mi-app/
 AppCelular/node_modules/
+AppCelular/dist/
 Backend_Arduino/node_modules/
 
 # Next.js

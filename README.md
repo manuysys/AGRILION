@@ -101,7 +101,8 @@ AppCelular/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 La URL de la API se configura desde **Configuración → Conexión API**. Para el
-emulador se usa `http://10.0.2.2:8000/`.
+emulador se usa `http://10.0.2.2:8000/`. Para el APK de demo instalable, ver
+`docs/INSTALACION_APK.md`.
 
 ## Firmware
 

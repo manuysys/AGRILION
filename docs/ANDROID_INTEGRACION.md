@@ -84,11 +84,20 @@ cd AppCelular
 .\gradlew.bat assembleDebug --no-daemon
 ```
 
+Para un teléfono físico se puede fijar la URL de la API en el build:
+
+```powershell
+.\gradlew.bat assembleDebug --no-daemon `
+  -PapiBaseUrl=http://192.168.68.50:8000/
+```
+
 APK generado:
 
 ```text
 AppCelular/app/build/outputs/apk/debug/app-debug.apk
 ```
+
+Guía de instalación y conexión: `docs/INSTALACION_APK.md`.
 
 ## Flujo de prueba manual
 

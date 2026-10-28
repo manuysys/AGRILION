@@ -1,6 +1,7 @@
 package com.example.app1.data
 
 import android.content.Context
+import com.example.app1.BuildConfig
 import kotlinx.coroutines.runBlocking
 import okhttp3.HttpUrl
 import okhttp3.Interceptor
@@ -15,7 +16,7 @@ import okhttp3.Interceptor
  * La URL se puede cambiar desde Configuración dentro de la app.
  */
 object ApiConfig {
-    const val DEFAULT_BASE_URL = "http://10.0.2.2:8000/"
+    val DEFAULT_BASE_URL: String = BuildConfig.API_BASE_URL
 
     private const val PREFS = "agrilion_api_config"
     private const val KEY_BASE_URL = "base_url"
