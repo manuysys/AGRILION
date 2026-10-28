@@ -9,7 +9,7 @@ import { useEffect } from 'react';
  * - Se pausa cuando el visitante interactúa y se reanuda a los segundos.
  * - Respeta prefers-reduced-motion.
  */
-const SPEED_PX_PER_SECOND = 36;
+const SPEED_PX_PER_SECOND = 48;
 const INITIAL_DELAY_MS = 1800;
 const BOTTOM_PAUSE_MS = 2600;
 const LOOP_PAUSE_MS = 1200;

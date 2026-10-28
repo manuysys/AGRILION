@@ -27,9 +27,16 @@ object ApiConfig {
 
     fun init(context: Context) {
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        baseUrl = prefs.getString(KEY_BASE_URL, null)
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_BASE_URL
+        val stored = prefs.getString(KEY_BASE_URL, null)?.takeIf { it.isNotBlank() }
+        // Si una instalación anterior guardó la IP local, migrar al HTTPS por defecto.
+        // Android bloquea cleartext a IPs que no estén en el network security config.
+        val legacyLocal = stored != null &&
+            DEFAULT_BASE_URL.startsWith("https://") &&
+            isLegacyLocalUrl(stored)
+        if (legacyLocal) {
+            prefs.edit().remove(KEY_BASE_URL).apply()
+        }
+        baseUrl = if (legacyLocal) DEFAULT_BASE_URL else stored ?: DEFAULT_BASE_URL
     }
 
     /** Guarda una URL nueva. Devuelve null si fue válida o un mensaje de error. */
@@ -52,6 +59,16 @@ object ApiConfig {
             .remove(KEY_BASE_URL)
             .apply()
         baseUrl = DEFAULT_BASE_URL
+    }
+
+    private fun isLegacyLocalUrl(raw: String): Boolean {
+        val url = HttpUrl.parse(raw) ?: return false
+        if (url.scheme() != "http") return false
+        val host = url.host()
+        return host == "10.0.2.2" ||
+            host == "192.168.68.50" ||
+            host.startsWith("192.168.") ||
+            host.startsWith("10.")
     }
 
     private fun normalize(raw: String): String? {

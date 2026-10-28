@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -97,41 +96,6 @@ fun SiloMapCard(
         }
     }
 
-    if (withGps.isEmpty()) {
-        Card(
-            modifier = modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = AgrilionTokens.SurfaceDark2)
-        ) {
-            Row(
-                modifier = Modifier.padding(18.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.LocationOff,
-                    contentDescription = null,
-                    tint = AgrilionTokens.Zinc400,
-                    modifier = Modifier.size(28.dp)
-                )
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text(
-                        "Todavía no hay posición GPS",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
-                    Text(
-                        "El Air530Z necesita vista al cielo para fijar. La última posición aparecerá acá.",
-                        color = AgrilionTokens.Zinc400,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-        }
-        return
-    }
-
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -147,24 +111,28 @@ fun SiloMapCard(
                     factory = { mapView },
                     update = { map ->
                         map.overlays.clear()
-                        withGps.forEach { silo ->
-                            val marker = Marker(map).apply {
-                                position = GeoPoint(silo.latitude!!, silo.longitude!!)
-                                title = silo.nombre
-                                snippet = "Riesgo ${silo.riskScore}/100 · ${silo.estado.texto}"
-                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                                setOnMarkerClickListener { _, _ ->
-                                    onSiloClick(silo.id)
-                                    true
+                        if (withGps.isEmpty()) {
+                            map.controller.setCenter(GeoPoint(-34.6037, -58.3816))
+                            map.controller.setZoom(5.0)
+                        } else {
+                            withGps.forEach { silo ->
+                                val marker = Marker(map).apply {
+                                    position = GeoPoint(silo.latitude!!, silo.longitude!!)
+                                    title = silo.nombre
+                                    snippet = "Riesgo ${silo.riskScore}/100 - ${silo.estado.texto}"
+                                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                    setOnMarkerClickListener { _, _ ->
+                                        onSiloClick(silo.id)
+                                        true
+                                    }
                                 }
+                                map.overlays.add(marker)
                             }
-                            map.overlays.add(marker)
+                            val avgLat = withGps.mapNotNull { it.latitude }.average()
+                            val avgLon = withGps.mapNotNull { it.longitude }.average()
+                            map.controller.setCenter(GeoPoint(avgLat, avgLon))
+                            map.controller.setZoom(15.0)
                         }
-
-                        val avgLat = withGps.mapNotNull { it.latitude }.average()
-                        val avgLon = withGps.mapNotNull { it.longitude }.average()
-                        map.controller.setCenter(GeoPoint(avgLat, avgLon))
-                        map.controller.setZoom(15.0)
                         map.invalidate()
                     },
                     modifier = Modifier.fillMaxWidth().height(240.dp)
@@ -186,7 +154,7 @@ fun SiloMapCard(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        "${withGps.size} silo(s) con GPS",
+                        if (withGps.isEmpty()) "Mapa de referencia - sin GPS" else "${withGps.size} silo(s) con GPS",
                         color = AgrilionTokens.Zinc400,
                         fontSize = 11.sp
                     )
