@@ -26,6 +26,7 @@ import { BenefitsSection } from "@/components/ui/benefits-section";
 import { TestimonialsSection } from "@/components/ui/testimonials-section";
 import { PricingSection } from "@/components/ui/pricing-section";
 import { CtaSection } from "@/components/ui/cta-section";
+import { AutoScrollLanding } from "@/components/ui/auto-scroll-landing";
 
 const navLinks = [
   { href: '/', label: 'Inicio' },
@@ -168,7 +169,7 @@ function Navigation() {
 export default function Home() {
   return (
     <div className="bg-zinc-950 text-white min-h-screen selection:bg-emerald-500/30">
-      
+      <AutoScrollLanding />
       <Navigation />
 
       {/* HERO */}
