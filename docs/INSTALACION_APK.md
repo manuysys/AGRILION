@@ -17,13 +17,13 @@ AppCelular/app/build/outputs/apk/debug/app-debug.apk
 Es un APK **debug**, firmado con la clave de desarrollo. Se puede instalar, pero
 no es el artefacto final para publicar.
 
-La versión **1.1** incluye el mapa OpenStreetMap visible aun sin fix GPS y migra
+La versión **1.2** incluye el mapa OpenStreetMap visible aun sin fix GPS y migra
 automáticamente la URL local antigua (`192.168.68.50`) al HTTPS del túnel.
 
 SHA-256 del APK generado:
 
 ```text
-B146FA72816E2EC1FE54848A2522A54BDC13CA6F0ED65B7F30B782FB4940CBA5
+95436DF5A633C12A4663114E1B5E935643657CA1861172AB7B54EC3839E5A13F
 ```
 
 ## Antes de instalar
@@ -37,7 +37,7 @@ B146FA72816E2EC1FE54848A2522A54BDC13CA6F0ED65B7F30B782FB4940CBA5
 La versión actual del APK apunta por defecto al túnel HTTPS:
 
 ```text
-https://ratings-trembl-armor-sql.trycloudflare.com/
+https://lung-potatoes-gradually-knowledge.trycloudflare.com/
 ```
 
 El túnel es temporal: si cambia, corregir la URL desde la app:
