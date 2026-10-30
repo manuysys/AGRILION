@@ -16,8 +16,8 @@ android {
         applicationId = "com.example.app1"
         minSdk = 24
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Valor por defecto del build. Para un teléfono físico:
         // -PapiBaseUrl=http://IP_DE_LA_PC:8000/
