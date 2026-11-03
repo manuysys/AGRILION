@@ -344,6 +344,14 @@ void setup()
   pinMode(GPIO14, OUTPUT);
   digitalWrite(GPIO14, LOW);
   GPSSerial.begin(9600);
+  delay(1200);
+
+  // Configuracion del Air530Z: GPS + BeiDou + GLONASS, NMEA a 9600.
+  // No bloquea: solo envia los comandos de configuracion al modulo.
+  GPS.setmode(MODE_GPS_BEIDOU_GLONASS);
+  delay(100);
+  GPS.setNMEA(NMEA_GGA | NMEA_GSA | NMEA_RMC | NMEA_VTG | NMEA_GLL | NMEA_GSV);
+  Serial.println("GPS configurado: GPS+BeiDou+GLONASS @9600");
 
   pinMode(Vext, OUTPUT);
   digitalWrite(Vext, LOW); 
