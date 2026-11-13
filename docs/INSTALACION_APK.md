@@ -17,13 +17,14 @@ AppCelular/app/build/outputs/apk/debug/app-debug.apk
 Es un APK **debug**, firmado con la clave de desarrollo. Se puede instalar, pero
 no es el artefacto final para publicar.
 
-La versión **1.3** incluye el mapa OpenStreetMap visible aun sin fix GPS y migra
-automáticamente la URL local antigua (`192.168.68.50`) al HTTPS del túnel.
+La versión **1.4** incluye el mapa OpenStreetMap visible aun sin fix GPS, migra
+automáticamente la URL local antigua (`192.168.68.50`) al HTTPS del túnel y
+también **migra túneles trycloudflare viejos** al túnel vigente del build.
 
 SHA-256 del APK generado:
 
 ```text
-BFFCABA6AB645E41D5D96797709F41F826FCFC03B008CE73AED540B14E45377C
+10AB237B6CC2184F7EE81B770A3262342F00935553D60564A3EDF8B37751E985
 ```
 
 ## Antes de instalar
@@ -37,7 +38,7 @@ BFFCABA6AB645E41D5D96797709F41F826FCFC03B008CE73AED540B14E45377C
 La versión actual del APK apunta por defecto al túnel HTTPS:
 
 ```text
-https://transition-epinions-hawk-berry.trycloudflare.com/
+https://represents-universal-nursery-archived.trycloudflare.com/
 ```
 
 El túnel es temporal: si cambia, corregir la URL desde la app:

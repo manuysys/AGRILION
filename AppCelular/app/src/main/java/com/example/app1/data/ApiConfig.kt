@@ -33,10 +33,15 @@ object ApiConfig {
         val legacyLocal = stored != null &&
             DEFAULT_BASE_URL.startsWith("https://") &&
             isLegacyLocalUrl(stored)
-        if (legacyLocal) {
+        // Un túnel rápido de Cloudflare cambia en cada reinicio de la PC:
+        // si la app guardó un túnel que ya no es el del build, migrar al vigente.
+        val legacyTunnel = stored != null &&
+            DEFAULT_BASE_URL.startsWith("https://") &&
+            isStaleTunnelUrl(stored)
+        if (legacyLocal || legacyTunnel) {
             prefs.edit().remove(KEY_BASE_URL).apply()
         }
-        baseUrl = if (legacyLocal) DEFAULT_BASE_URL else stored ?: DEFAULT_BASE_URL
+        baseUrl = if (legacyLocal || legacyTunnel) DEFAULT_BASE_URL else stored ?: DEFAULT_BASE_URL
     }
 
     /** Guarda una URL nueva. Devuelve null si fue válida o un mensaje de error. */
@@ -69,6 +74,14 @@ object ApiConfig {
             host == "192.168.68.50" ||
             host.startsWith("192.168.") ||
             host.startsWith("10.")
+    }
+
+    /** Detecta un túnel trycloudflare viejo que ya no es el del build actual. */
+    private fun isStaleTunnelUrl(raw: String): Boolean {
+        val url = HttpUrl.parse(raw) ?: return false
+        val storedHost = url.host()
+        val defaultHost = HttpUrl.parse(DEFAULT_BASE_URL)?.host() ?: return false
+        return storedHost.endsWith(".trycloudflare.com") && storedHost != defaultHost
     }
 
     private fun normalize(raw: String): String? {
