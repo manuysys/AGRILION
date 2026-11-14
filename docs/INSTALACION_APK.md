@@ -17,14 +17,19 @@ AppCelular/app/build/outputs/apk/debug/app-debug.apk
 Es un APK **debug**, firmado con la clave de desarrollo. Se puede instalar, pero
 no es el artefacto final para publicar.
 
-La versión **1.4** incluye el mapa OpenStreetMap visible aun sin fix GPS, migra
-automáticamente la URL local antigua (`192.168.68.50`) al HTTPS del túnel y
-también **migra túneles trycloudflare viejos** al túnel vigente del build.
+La versión **1.5** (versionCode 6) integra las funciones del fork `app1`: modo
+demo, pantalla de silos por grano, gestor de alertas con notificaciones,
+umbrales editables en Configuración, recuperación de contraseña y registro con
+datos de perfil, campo de cantidad TN/KG al crear silos, mapa de "Mis Silos" con
+ubicación del usuario (con permisos de ubicación) y en el detalle de silo un
+mini-mapa con estado GPS y las secciones de las IAs (LSTM, anomalías y riesgo).
+Además mantiene la migración automática de túneles trycloudflare viejos al
+túnel vigente del build.
 
 SHA-256 del APK generado:
 
 ```text
-10AB237B6CC2184F7EE81B770A3262342F00935553D60564A3EDF8B37751E985
+0F2E6481C5DECF121102EE54D3E710B0F19639D2DE64C3D86466C317C05DFA07
 ```
 
 ## Antes de instalar
@@ -38,11 +43,15 @@ SHA-256 del APK generado:
 La versión actual del APK apunta por defecto al túnel HTTPS:
 
 ```text
-https://represents-universal-nursery-archived.trycloudflare.com/
+https://efficiently-aerospace-thunder-voluntary.trycloudflare.com/
 ```
 
 El túnel es temporal: si cambia, corregir la URL desde la app:
-**Configuración → Conexión API**.
+**Configuración → Conexión API**, o regenerar todo con:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\renew_tunnel.ps1 -RebuildApk
+```
 
 La API actual escucha en loopback (`::1`) para que no se caiga cuando cambia la
 Wi-Fi; el teléfono debe usar el túnel HTTPS, no la IP local `192.168.68.50`.

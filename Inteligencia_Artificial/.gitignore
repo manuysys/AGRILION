@@ -20,6 +20,10 @@ data/*.h5
 models/*.h5
 *.keras
 
+# Índice RAG (regenerable con scripts/index_docs.py)
+data/rag_index.npz
+data/rag_meta.json
+
 # Logs
 *.log
 outputs/

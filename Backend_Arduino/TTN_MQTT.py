@@ -25,8 +25,10 @@ TTN_BROKER = os.getenv("TTN_BROKER")
 TTN_PORT = int(os.getenv("TTN_PORT", "1883"))
 TTN_USER = os.getenv("TTN_USER")
 TTN_PASS = os.getenv("TTN_PASS")
-# El topic incluye el tenant: v3/{app_id}@ttn/devices/+/up
-TTN_TOPIC = os.getenv("TTN_TOPIC") or f"v3/{TTN_USER}/devices/+/up"
+# El topic de suscripción a TTN: v3/{app_id}/devices/+/up
+# TTN_USER es "{app_id}@ttn", pero el topic usa SOLO el app_id (sin @ttn)
+_TTN_APP_ID = TTN_USER.replace("@ttn", "") if TTN_USER else None
+TTN_TOPIC = os.getenv("TTN_TOPIC") or f"v3/{_TTN_APP_ID}/devices/+/up"
 
 HIVEMQ_BROKER = os.getenv("HIVEMQ_BROKER")
 HIVEMQ_PORT = int(os.getenv("HIVEMQ_PORT"))

@@ -183,6 +183,91 @@ export async function getSiloCurrent(
   }
 }
 
+// ─── AI Analysis (por silo) ──────────────────────────────────────────────────
+
+/**
+ * Un paso de la predicción LSTM (p. ej. horizonte +1 h o +6 h).
+ */
+export interface SiloAiAnalysisStep {
+  step?: number;
+  hours_ahead?: number | null;
+  timestamp?: string | null;
+  temperature?: number | null;
+  humidity?: number | null;
+  co2?: number | null;
+}
+
+/**
+ * Punto plano persistido por el pipeline en la medición `ai_analisis`
+ * (InfluxDB). Es el shape actual real del endpoint `/silos/{id}/ai-analysis`.
+ */
+export interface SiloAiAnalysisLatestPoint {
+  timestamp?: string | null;
+  risk_score?: number | null;
+  risk_level?: string | null;
+  anomaly?: boolean | null;
+  /** String separado por comas, p. ej. "temperature,co2". */
+  affected_sensors?: string | null;
+  pred_temp_1h?: number | null;
+  pred_hum_1h?: number | null;
+  pred_co2_1h?: number | null;
+  engine?: string | null;
+}
+
+/**
+ * Salida del endpoint de análisis IA por silo (`/silos/{id}/ai-analysis`).
+ * Acepta el shape plano persistido (`latest`) y un shape anidado más rico
+ * (`lstm.steps` + `risk`) para cuando el backend publique horizontes extra.
+ * El frontend degrada con elegancia cuando algo falta.
+ */
+export interface SiloAiAnalysisData {
+  silo_id?: string;
+  timestamp?: string | null; // momento en que se generó el análisis
+  generated_at?: string | null;
+  source?: string | null; // p. ej. "demo"
+  latest?: SiloAiAnalysisLatestPoint | null;
+  lstm?: {
+    status?: string; // 'ok' | 'insufficient_data'
+    readings?: number | null;
+    required?: number | null;
+    steps?: SiloAiAnalysisStep[];
+  } | null;
+  anomalies?: {
+    is_anomaly?: boolean | null;
+    affected_sensors?: string[];
+  } | null;
+  risk?: {
+    score?: number | null;
+    level?: string | null;
+    factors?: string[];
+  } | null;
+}
+
+/**
+ * Análisis IA de un silo: predicción LSTM, detección de anomalías y motor de
+ * riesgo. Devuelve null si la AI API no responde (el endpoint puede aún no
+ * existir): la UI muestra un estado vacío en ese caso.
+ */
+export async function getSiloAiAnalysis(
+  siloId: string,
+  token?: string | null
+): Promise<SiloAiAnalysisData | null> {
+  try {
+    const res = await fetch(
+      apiUrl(`/silos/${encodeURIComponent(siloId)}/ai-analysis`),
+      requestOptions(8000, token)
+    );
+    if (!res.ok) {
+      console.warn(`AI API ai-analysis failed: ${res.status}`);
+      return null;
+    }
+    return (await res.json()) as SiloAiAnalysisData;
+  } catch (e) {
+    console.warn('AI API ai-analysis error:', e);
+    return null;
+  }
+}
+
 /**
  * Enviar mensaje al chatbot de IA.
  *
@@ -252,7 +337,8 @@ export async function ingestReading(
   reading: IngestRequest
 ): Promise<IngestResponse | null> {
   try {
-    const res = await fetch(apiUrl('/ingest'), {
+    // Usar proxy server-side para no exponer la ingest key en el cliente
+    const res = await fetch('/api/ai/ingest', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(reading),

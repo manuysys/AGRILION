@@ -26,6 +26,25 @@ export function formatRelativeTime(isoString: string): string {
 }
 
 /**
+ * Formatea una antigüedad expresada en minutos (p. ej. la antigüedad del fix
+ * GPS que llega como ageMin en vez de como timestamp ISO).
+ */
+export function formatRelativeMinutes(minutes: number | null | undefined): string {
+  if (minutes === null || minutes === undefined || !Number.isFinite(minutes) || minutes < 0) {
+    return '—';
+  }
+  if (minutes < 1) return 'hace instantes';
+  if (minutes < 60) return `hace ${Math.round(minutes)} min`;
+  const hours = minutes / 60;
+  if (hours < 24) {
+    const rounded = Math.round(hours * 10) / 10;
+    return `hace ${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)} h`;
+  }
+  const days = Math.floor(hours / 24);
+  return days === 1 ? 'hace 1 día' : `hace ${days} días`;
+}
+
+/**
  * Get freshness color class based on how old the data is
  */
 export function getFreshnessColor(isoString: string): string {

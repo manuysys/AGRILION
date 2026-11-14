@@ -143,6 +143,7 @@ class ChatbotService:
         """
         t0 = time.time()
         context = context_override or self._fetch_context(silo_id)
+        self._augment_context_with_docs(message, context)
 
         # Cache check (skip for high-risk states — always generate fresh)
         risk_score = context.get("risk_score") or 0
@@ -164,6 +165,7 @@ class ChatbotService:
             messages = builder.build_short_response_prompt(message)
         else:
             messages = builder.build_messages(message, conversation_history=history)
+        self._inject_project_docs(messages, context)
 
         try:
             if isinstance(self.llm, FallbackLLMClient):
@@ -231,6 +233,57 @@ class ChatbotService:
         self.memory.clear(session_id)
 
     # ─── Private ─────────────────────────────────────────────────────────────
+
+    def _augment_context_with_docs(self, message: str, context: dict) -> None:
+        """
+        Agrega al contexto los top-3 chunks de documentación del proyecto
+        relevantes a la pregunta (RAG con embeddings locales vía Ollama).
+
+        try/except total: si Ollama/embeddings/índice fallan, el chat
+        continúa igual sin documentación.
+        """
+        if not (message or "").strip() or not isinstance(context, dict):
+            return
+        try:
+            from .rag import get_rag_index
+
+            index = get_rag_index()
+            if index.is_empty:
+                return
+            hits = index.search(message, k=3)
+            if not hits:
+                return
+            context["project_docs"] = [
+                {"name": h.get("name", ""), "score": h.get("score", 0.0), "text": h.get("text", "")}
+                for h in hits
+            ]
+            logger.info(
+                f"RAG: {len(hits)} chunks inyectados "
+                f"({', '.join(h.get('name', '?') for h in hits)})"
+            )
+        except Exception as e:
+            logger.warning(f"RAG augmentation skipped: {e}")
+
+    @staticmethod
+    def _inject_project_docs(messages: list, context: dict) -> None:
+        """Agrega los chunks RAG como sección legible en el system prompt."""
+        docs = (context or {}).get("project_docs") or []
+        if not docs or not messages or messages[0].get("role") != "system":
+            return
+        parts = ["", "=== DOCUMENTACIÓN DEL PROYECTO ==="]
+        for d in docs:
+            name = d.get("name", "?")
+            text = (d.get("text") or "").strip()
+            if not text:
+                continue
+            parts.append(f"--- Documentación del proyecto (fuente: {name}) ---")
+            parts.append(text)
+            parts.append("")
+        parts.append(
+            "Si la pregunta se relaciona con esta documentación, apoyate en ella para responder. "
+            "Mencioná la fuente si la usás; si no aplica, ignorala."
+        )
+        messages[0]["content"] += "\n" + "\n".join(parts)
 
     def _fetch_context(self, silo_id: str) -> dict:
         """

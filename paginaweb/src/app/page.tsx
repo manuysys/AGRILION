@@ -100,11 +100,11 @@ function Navigation() {
             <AnimatePresence mode="wait">
               {mobileMenuOpen ? (
                 <motion.div key="close" initial={{ scale: 0, rotate: -90 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0, rotate: 90 }} transition={{ duration: 0.2 }}>
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5" aria-hidden="true" />
                 </motion.div>
               ) : (
                 <motion.div key="menu" initial={{ scale: 0, rotate: 90 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0, rotate: -90 }} transition={{ duration: 0.2 }}>
-                  <Menu className="w-5 h-5" />
+                  <Menu className="w-5 h-5" aria-hidden="true" />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -315,7 +315,7 @@ export default function Home() {
               Solicitar Info
             </Link>
           </div>
-          <div className="w-full border-t border-white/5 pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-zinc-600">
+          <div className="w-full border-t border-white/5 pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-zinc-500">
             <span>&copy; {new Date().getFullYear()} Agrilion. Todos los derechos reservados.</span>
             <div className="flex gap-6 mt-4 md:mt-0">
               <Link href="/terminos" className="hover:text-emerald-500 transition-colors">Términos</Link>

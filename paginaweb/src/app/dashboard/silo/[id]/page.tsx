@@ -1,4 +1,4 @@
-import { fetchSiloDetail } from '@/lib/data-service';
+import { fetchSiloDetail, IS_DEMO_MODE } from '@/lib/data-service';
 import { notFound } from 'next/navigation';
 import SiloDetailClient from '@/components/dashboard/silo-detail-client';
 
@@ -28,5 +28,5 @@ export default async function SiloDetailPage({
     notFound();
   }
 
-  return <SiloDetailClient silo={silo} />;
+  return <SiloDetailClient silo={silo} demoMode={IS_DEMO_MODE} />;
 }

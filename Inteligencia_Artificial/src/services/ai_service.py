@@ -239,6 +239,11 @@ class AIService:
                 "seq_length_used": self.seq_length,
                 "n_readings_available": len(df),
                 "pipeline_version": "1.0",
+                "engine": (
+                    "lstm+consenso3+riesgo_compuesto"
+                    if self.anomaly_detector
+                    else "lstm+riesgo_compuesto"
+                ),
             },
         )
 

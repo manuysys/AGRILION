@@ -412,7 +412,9 @@ def on_hive_message(client, userdata, msg):
         print(f"Evento: {evento}")
 
     except Exception as e:
-        print("❌ Error:", e)
+        print(f"❌ Error procesando mensaje MQTT: {e}")
+        import traceback
+        traceback.print_exc()
 
 hive.on_connect = on_hive_connect
 hive.on_message = on_hive_message

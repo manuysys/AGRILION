@@ -116,7 +116,7 @@ def send_to_ai_api(payload: dict) -> dict | None:
         else:
             logger.warning(
                 f"⚠️ AI API {response.status_code} | {payload['silo_id']}: "
-                f"{response.text[:100]}"
+                f"{response.text[:200]}"
             )
             return None
 
@@ -128,6 +128,8 @@ def send_to_ai_api(payload: dict) -> dict | None:
         return None
     except Exception as e:
         logger.error(f"❌ AI API error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return None
 
 

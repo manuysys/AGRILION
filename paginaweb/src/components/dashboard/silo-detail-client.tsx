@@ -10,12 +10,16 @@ import RiskGauge from '@/components/ui/risk-gauge';
 import TimelineChart from '@/components/ui/timeline-chart';
 import AlertCard from '@/components/ui/alert-card';
 import AnomalyBadge from '@/components/ui/anomaly-badge';
+import SiloMiniMap from '@/components/dashboard/silo-mini-map';
+import SiloAiAnalysis from '@/components/dashboard/silo-ai-analysis';
 import { BeamsBackground } from '@/components/ui/beams-background';
 import { formatTemp, formatHumidity, formatCO2, formatPressure, formatBattery, formatRelativeTime, formatFullDate, getFreshnessColor } from '@/lib/formatters';
 import { getTemperatureState, getHumidityState, getCO2State, getBatteryState } from '@/lib/thresholds';
 
 interface SiloDetailClientProps {
   silo: SiloBag;
+  /** Propagado desde el Server Component (IS_DEMO_MODE en data-service). */
+  demoMode?: boolean;
 }
 
 const stagger = {
@@ -31,7 +35,7 @@ const fadeUp = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] } }
 };
 
-export default function SiloDetailClient({ silo }: SiloDetailClientProps) {
+export default function SiloDetailClient({ silo, demoMode = false }: SiloDetailClientProps) {
   const batteryState = getBatteryState(silo.sensor.battery);
   const isCritical = silo.state === 'critical';
 
@@ -101,6 +105,11 @@ export default function SiloDetailClient({ silo }: SiloDetailClientProps) {
         </div>
       </motion.section>
 
+      {/* Ubicación GPS (mini-mapa + estado del fix) */}
+      <motion.div variants={fadeUp}>
+        <SiloMiniMap silo={silo} />
+      </motion.div>
+
       {/* AI Interpretation */}
       <motion.div
         variants={fadeUp}
@@ -139,6 +148,11 @@ export default function SiloDetailClient({ silo }: SiloDetailClientProps) {
             ))}
           </div>
         </div>
+      </motion.div>
+
+      {/* AI Engine Analysis (LSTM + anomalías + riesgo) */}
+      <motion.div variants={fadeUp}>
+        <SiloAiAnalysis silo={silo} demoMode={demoMode} />
       </motion.div>
 
       {/* Metric Cards */}

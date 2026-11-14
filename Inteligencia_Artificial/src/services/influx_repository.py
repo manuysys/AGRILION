@@ -31,8 +31,8 @@ Requiere:
 
 import logging
 import math
-from datetime import datetime, timedelta
-from typing import List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Dict, List, Optional
 
 import pandas as pd
 
@@ -53,6 +53,71 @@ logger = logging.getLogger(__name__)
 # InfluxDB 3 Core no soporta DELETE, así que se excluyen en las consultas.
 EXCLUDED_DEVICES = {"test-device-001"}
 EXCLUDED_SILOS = {"SB-TEST01"}
+
+# Medición donde se persiste el resultado del pipeline AI (/ingest):
+# LSTM + anomalías (consenso 3 métodos) + riesgo compuesto + alertas.
+AI_MEASUREMENT = "ai_analisis"
+DEFAULT_ENGINE = "lstm+consenso3+riesgo_compuesto"
+
+
+def _sql_str(value) -> str:
+    """Escapa un string para usarlo dentro de una comparación SQL."""
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _analysis_time_utc(value) -> str:
+    """Normaliza el timestamp de un AIResult a ISO-8601 UTC.
+
+    Timestamps naive se interpretan como UTC (misma convención que _iso_utc
+    al leer). Ante un valor inválido, usa "ahora" para no perder el punto.
+    """
+    try:
+        ts = pd.Timestamp(value)
+        if ts.tzinfo is None:
+            ts = ts.tz_localize("UTC")
+        return ts.tz_convert("UTC").isoformat()
+    except Exception:
+        return datetime.now(timezone.utc).isoformat()
+
+
+def _opt_float(row, key: str) -> Optional[float]:
+    try:
+        v = row.get(key)
+        if v is None or pd.isna(v):
+            return None
+        return round(float(v), 3)
+    except (TypeError, ValueError):
+        return None
+
+
+def _opt_int(row, key: str) -> Optional[int]:
+    try:
+        v = row.get(key)
+        if v is None or pd.isna(v):
+            return None
+        return int(float(v))
+    except (TypeError, ValueError):
+        return None
+
+
+def _opt_bool(row, key: str) -> Optional[bool]:
+    try:
+        v = row.get(key)
+        if v is None or pd.isna(v):
+            return None
+        return bool(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _opt_str(row, key: str) -> Optional[str]:
+    try:
+        v = row.get(key)
+        if v is None or pd.isna(v):
+            return None
+        return str(v)
+    except (TypeError, ValueError):
+        return None
 
 
 def _normalize_pressure(value) -> Optional[float]:
@@ -188,14 +253,168 @@ class InfluxRepository(AbstractSiloRepository):
         return True
 
     def save_result(self, result: AIResult) -> bool:
-        """No implementado: los resultados de la AI no se guardan en InfluxDB."""
-        return True
+        """
+        Persiste el resultado del pipeline AI en la medición 'ai_analisis'.
+
+        Tag: silo_id.
+        Fields: risk_score (int), risk_level (str), anomaly (bool),
+                affected_sensors (str, separado por comas),
+                pred_temp_1h / pred_hum_1h / pred_co2_1h (float),
+                engine (str).
+
+        Siempre escribe TODOS los fields (con defaults no-None) para que
+        el schema de la tabla quede completo desde la primera escritura.
+        """
+        try:
+            predictions = result.predictions or {}
+            anomalies = result.anomalies or {}
+            affected = anomalies.get("affected_sensors") or []
+            if isinstance(affected, (list, tuple)):
+                affected_str = ",".join(str(s) for s in affected)
+            else:
+                affected_str = str(affected)
+
+            fields = {
+                "risk_score": int(result.risk_score or 0),
+                "risk_level": str(result.risk_level or ""),
+                "anomaly": bool(anomalies.get("is_anomaly", False)),
+                "affected_sensors": affected_str,
+                "pred_temp_1h": float(predictions.get("temperature", 0.0) or 0.0),
+                "pred_hum_1h": float(predictions.get("humidity", 0.0) or 0.0),
+                "pred_co2_1h": float(predictions.get("co2", 0.0) or 0.0),
+                "engine": str((result.metadata or {}).get("engine") or DEFAULT_ENGINE),
+            }
+
+            record = {
+                "measurement": AI_MEASUREMENT,
+                "tags": {"silo_id": str(result.silo_id)},
+                "fields": fields,
+                "time": _analysis_time_utc(result.timestamp),
+            }
+            self._client.write(record=record)
+            return True
+
+        except Exception as e:
+            logger.error(f"Error escribiendo {AI_MEASUREMENT} en InfluxDB: {e}")
+            return False
 
     def get_result_history(
         self, silo_id: str, hours: int = 24
     ) -> List[dict]:
-        """Los resultados de la AI no se guardan en InfluxDB."""
-        return []
+        """
+        Devuelve los análisis AI persistidos de un silo en las últimas N horas,
+        ordenados del más reciente al más viejo. Tolerante: si la medición
+        'ai_analisis' todavía no existe, devuelve [].
+        """
+        if silo_id in EXCLUDED_SILOS:
+            return []
+
+        query = f"""
+        SELECT *
+        FROM "{AI_MEASUREMENT}"
+        WHERE silo_id = {_sql_str(silo_id)}
+          AND time >= NOW() - INTERVAL '{int(hours)} hours'
+        ORDER BY time DESC
+        LIMIT 500
+        """
+
+        try:
+            table = self._client.query(query)
+            df = table.to_pandas()
+        except Exception as e:
+            # Medición inexistente o query fallida: no es un error operativo.
+            logger.info(f"{AI_MEASUREMENT} no disponible para {silo_id}: {e}")
+            return []
+
+        if df.empty:
+            return []
+
+        history = []
+        for _, row in df.iterrows():
+            history.append({
+                "timestamp": _iso_utc(row.get("time", "")),
+                "risk_score": _opt_int(row, "risk_score"),
+                "risk_level": _opt_str(row, "risk_level"),
+                "anomaly": _opt_bool(row, "anomaly"),
+                "affected_sensors": _opt_str(row, "affected_sensors"),
+                "pred_temp_1h": _opt_float(row, "pred_temp_1h"),
+                "pred_hum_1h": _opt_float(row, "pred_hum_1h"),
+                "pred_co2_1h": _opt_float(row, "pred_co2_1h"),
+                "engine": _opt_str(row, "engine"),
+            })
+        return history
+
+    def get_latest_ai_analysis_per_silo(
+        self, hours: int = 24
+    ) -> Dict[str, dict]:
+        """
+        Último análisis AI de cada silo dentro de las últimas N horas.
+
+        Devuelve {silo_id: {ai_risk_score, ai_risk_level, ai_anomaly,
+        ai_analysis_at}}. Tolerante a la medición inexistente ({}).
+        """
+        query = f"""
+        SELECT a.time, a.silo_id, a.risk_score, a.risk_level, a.anomaly
+        FROM "{AI_MEASUREMENT}" a
+        INNER JOIN (
+            SELECT silo_id, MAX(time) AS max_time
+            FROM "{AI_MEASUREMENT}"
+            WHERE time >= NOW() - INTERVAL '{int(hours)} hours'
+            GROUP BY silo_id
+        ) latest ON a.silo_id = latest.silo_id AND a.time = latest.max_time
+        """
+
+        try:
+            table = self._client.query(query)
+            df = table.to_pandas()
+        except Exception as e:
+            logger.info(f"{AI_MEASUREMENT} no disponible para overview: {e}")
+            return {}
+
+        latest: Dict[str, dict] = {}
+        if df.empty:
+            return latest
+
+        for _, row in df.iterrows():
+            silo_id = _opt_str(row, "silo_id")
+            if not silo_id:
+                continue
+            latest[silo_id] = {
+                "ai_risk_score": _opt_int(row, "risk_score"),
+                "ai_risk_level": _opt_str(row, "risk_level"),
+                "ai_anomaly": _opt_bool(row, "anomaly"),
+                "ai_analysis_at": _iso_utc(row.get("time", "")),
+            }
+        return latest
+
+    def get_last_device_for_silo(self, silo_id: str) -> Optional[str]:
+        """
+        device_id de la última lectura conocida de un silo (medición 'sensores').
+
+        Se usa para el mapeo seguro silo→owner vía Firestore antes de crear
+        alertas. Devuelve None si no hay lecturas con device.
+        """
+        query = f"""
+        SELECT device
+        FROM "{self._measurement}"
+        WHERE silo = {_sql_str(silo_id)}
+          AND device IS NOT NULL
+        ORDER BY time DESC
+        LIMIT 1
+        """
+
+        try:
+            table = self._client.query(query)
+            df = table.to_pandas()
+            if df.empty:
+                return None
+            device = df.iloc[-1].get("device")
+            if device is None or pd.isna(device):
+                return None
+            return str(device)
+        except Exception as e:
+            logger.warning(f"No se pudo resolver device para {silo_id}: {e}")
+            return None
 
     # ─── Endpoints públicos para el frontend ──────────────────────────────────
 

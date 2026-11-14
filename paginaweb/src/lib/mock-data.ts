@@ -246,15 +246,22 @@ const mockCoordinates: Record<string, { latitude: number; longitude: number }> =
 
 export const mockSiloBags: SiloBag[] = mockSiloBagsBase.map((silo) => {
   const coordinates = mockCoordinates[silo.id] ?? null;
+  const isOnline = silo.sensor.connection === 'online';
+  // La antigüedad del fix sigue a la última transmisión del nodo: en la demo,
+  // un silo offline muestra su última posición conocida con la edad de esa lectura.
+  const offlineAgeMin = Math.max(
+    1,
+    Math.round((Date.now() - new Date(silo.sensor.lastSeen).getTime()) / 60_000)
+  );
   return {
     ...silo,
     coordinates,
     gps: {
       hasFix: Boolean(coordinates),
-      currentFix: Boolean(coordinates) && silo.sensor.connection === 'online',
+      currentFix: Boolean(coordinates) && isOnline,
       satellites: coordinates ? 9 : null,
       hdop: coordinates ? 0.8 : null,
-      ageMin: coordinates ? 0 : null,
+      ageMin: coordinates ? (isOnline ? 0 : offlineAgeMin) : null,
     },
   };
 });

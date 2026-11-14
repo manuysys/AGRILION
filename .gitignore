@@ -65,6 +65,27 @@ __pycache__/
 INFLUXDB_TOKEN
 .agents/
 
+# Firebase service accounts (nunca commitear)
+*/firebase/serviceAccountKey.json
+*/firebase/*.json
+!*/firebase/README.md
+
 # Playwright / capturas de auditoría
 .playwright-mcp/
 alerts_fix*.png
+
+# Fork app1 extraido del zip (ya integrado en AppCelular)
+app1_extracted/
+
+# Copias vendidas preexistentes dentro de AppCelular (no usar, no borrar por ahora)
+AppCelular/AGRILION-main/
+AppCelular/Backend/
+AppCelular/IA chatbot/
+AppCelular/.idea/
+
+# Capturas y logs locales en la raiz
+AI_API_stderr.log
+AI_API_stdout.log
+emulator_screen.png
+schematic.png
+silo-detail-e2e.png

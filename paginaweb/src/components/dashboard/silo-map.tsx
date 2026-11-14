@@ -7,26 +7,13 @@ import { Lock, MapPin } from 'lucide-react';
 import type { Map as LeafletMap } from 'leaflet';
 import { auth } from '@/lib/firebase';
 import type { SiloBag } from '@/types';
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (char) => {
-    const entities: Record<string, string> = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;',
-    };
-    return entities[char] ?? char;
-  });
-}
-
-function markerColor(state: SiloBag['state']): string {
-  if (state === 'critical') return '#ef4444';
-  if (state === 'warn') return '#f59e0b';
-  if (state === 'offline') return '#71717a';
-  return '#10b981';
-}
+import {
+  buildGpsMarkerIcon,
+  createDarkMap,
+  escapeHtml,
+  gpsStatusLabel,
+  markerColor,
+} from './leaflet-shared';
 
 export default function SiloMap({
   silos,
@@ -52,30 +39,14 @@ export default function SiloMap({
     let map: LeafletMap | null = null;
 
     async function renderMap() {
-      const L = (await import('leaflet')).default;
       if (cancelled || !containerRef.current) return;
 
-      map = L.map(containerRef.current, {
-        zoomControl: true,
-        scrollWheelZoom: false,
-        attributionControl: true,
-      });
-
-      L.tileLayer(
-        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        {
-          attribution: '&copy; OpenStreetMap contributors',
-          subdomains: 'abc',
-          maxZoom: 19,
-        }
-      ).addTo(map);
-
-      // Estilo oscuro sin API key. El filtro se aplica solo al pane de tiles,
-      // no a los marcadores ni a los popups.
-      const tilePane = map.getPane('tilePane');
-      if (tilePane) {
-        tilePane.style.filter = 'invert(1) hue-rotate(180deg) brightness(0.86) contrast(0.9)';
+      const { map: createdMap, L } = await createDarkMap(containerRef.current);
+      if (cancelled) {
+        createdMap.remove();
+        return;
       }
+      map = createdMap;
 
       const withGps = silos.filter(
         (silo) =>
@@ -91,12 +62,13 @@ export default function SiloMap({
       withGps.forEach((silo) => {
         const coordinates = silo.coordinates!;
         const color = markerColor(silo.state);
-        const icon = L.divIcon({
-          className: 'agrilion-map-marker',
-          html: `<span style="display:block;width:16px;height:16px;border-radius:9999px;background:${color};border:3px solid #09090b;box-shadow:0 0 0 2px ${color}55, 0 0 18px ${color}88;"></span>`,
-          iconSize: [16, 16],
-          iconAnchor: [8, 8],
-        });
+        const currentFix = silo.gps?.currentFix ?? false;
+        const icon = buildGpsMarkerIcon(L, { color, currentFix });
+
+        const gpsStatus = gpsStatusLabel(silo.gps);
+        const gpsLine = gpsStatus
+          ? `<div style="font-size:11px;margin-top:6px;color:${currentFix ? '#34d399' : '#fbbf24'};">● ${escapeHtml(gpsStatus)}</div>`
+          : '';
 
         const popup = `
           <div style="min-width:210px;font-family:system-ui,sans-serif;background:#18181b;color:#fff;border-radius:10px;padding:2px 0;">
@@ -107,6 +79,7 @@ export default function SiloMap({
               T: ${silo.currentReading.temperature.toFixed(1)} °C · H: ${silo.currentReading.humidity.toFixed(1)}%<br/>
               CO₂: ${Math.round(silo.currentReading.co2)} ppm
             </div>
+            ${gpsLine}
             <a href="/dashboard/silo/${encodeURIComponent(silo.id)}" style="display:inline-block;margin-top:8px;font-size:12px;font-weight:700;color:#34d399;">Ver detalle →</a>
           </div>
         `;

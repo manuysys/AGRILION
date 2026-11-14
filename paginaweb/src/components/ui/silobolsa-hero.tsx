@@ -68,7 +68,7 @@ export function SilobolsaHero() {
             className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-500 px-7 py-3 text-sm font-black text-zinc-950 transition-colors hover:bg-emerald-400"
           >
             Ver dashboard
-            <ArrowRight size={17} />
+            <ArrowRight size={17} aria-hidden="true" />
           </Link>
           <a
             href="#como-funciona"
@@ -83,11 +83,11 @@ export function SilobolsaHero() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.4, duration: 0.8 }}
-          className="mt-10 inline-flex flex-col items-center gap-1 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 transition-colors hover:text-emerald-400"
+          className="mt-10 inline-flex flex-col items-center gap-1 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 transition-colors hover:text-emerald-400"
           aria-label="Bajar al dashboard"
         >
           Explorar
-          <ChevronDown size={16} />
+          <ChevronDown size={16} aria-hidden="true" />
         </motion.a>
 
       </div>

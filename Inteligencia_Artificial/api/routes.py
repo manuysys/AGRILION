@@ -11,6 +11,7 @@ Endpoints REST para integración del sistema ML de AGRILION:
 
 import numpy as np
 import pandas as pd
+import time
 from datetime import datetime
 from typing import Optional
 from pathlib import Path
@@ -38,6 +39,13 @@ from .schemas import (
     SilosOverviewResponse,
     SiloHistoryItem,
     SiloHistoryResponse,
+    DocumentUploadRequest,
+    DocumentUploadResponse,
+    DocumentInfo,
+    DocumentListResponse,
+    DocumentDeleteResponse,
+    AIAnalysisPoint,
+    AIAnalysisResponse,
 )
 
 import sys
@@ -52,6 +60,7 @@ from src.risk_engine import RiskEngine
 from src.alerts import AlertSystem
 from src.services.ai_service import AIService, InMemoryRepository, SensorReading as AISensorReading
 from src.chatbot import ChatbotService, LLMConfig, FallbackClient
+from src.chatbot.rag import RAGUnavailable, get_rag_index
 from src.services.influx_repository import create_repository_from_env, InfluxRepository
 from src.services.firebase_service import get_firebase_service
 from .security import (
@@ -155,6 +164,70 @@ def _readings_to_df(readings) -> pd.DataFrame:
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df = df.set_index("timestamp").sort_index()
     return df
+
+
+# ─── Alertas → Firestore (mapeo seguro silo→owner) ──────────────────────────
+#
+# Mapeo aceptado: device_id de la última lectura del silo (InfluxDB 'sensores')
+# DEBE estar registrado en Firestore (colección sensors/{device_id}) apuntando
+# exactamente al MISMO silo y a un ownerUid. Si falta cualquiera de esas
+# condiciones, NO se escribe en Firestore (evita alertas a un dueño equivocado).
+# Un debounce en memoria evita duplicar la misma alerta en cada lectura.
+
+_firestore_alert_ts: dict = {}
+_FIRESTORE_ALERT_COOLDOWN_S = 30 * 60
+
+
+def _notify_firestore_alerts(silo_id: str, alerts: list) -> int:
+    """Crea en Firestore las alertas generadas por /ingest. NUNCA lanza."""
+    if not alerts:
+        return 0
+    try:
+        fb = get_firebase_service()
+        if not fb or _influx_repo is None:
+            return 0
+
+        device_id = _influx_repo.get_last_device_for_silo(silo_id)
+        if not device_id:
+            return 0
+
+        info = fb.get_sensor_info(device_id)
+        if not info:
+            return 0
+        # Confirmación de mapeo: el device debe pertenecer a ESTE silo.
+        if str(info.get("siloId") or "") != str(silo_id):
+            logger.info(
+                f"Firestore alerts: device {device_id} no mapea a silo {silo_id}; "
+                "se omite create_alert"
+            )
+            return 0
+        owner_uid = info.get("ownerUid")
+        if not owner_uid:
+            return 0
+
+        created = 0
+        now = time.time()
+        for alert in alerts:
+            level = str(alert.get("level", "info"))
+            category = str(alert.get("category", "sistema"))
+            key = (str(silo_id), category, level)
+            if now - _firestore_alert_ts.get(key, 0) < _FIRESTORE_ALERT_COOLDOWN_S:
+                continue
+            fb.create_alert(
+                owner_uid=str(owner_uid),
+                silo_id=str(silo_id),
+                level=level.lower() or "info",
+                title=category or "sistema",
+                message=str(alert.get("message", "")),
+                recommendation=str(alert.get("recommendation", "")),
+            )
+            _firestore_alert_ts[key] = now
+            created += 1
+        return created
+
+    except Exception as e:
+        logger.warning(f"No se pudieron crear alertas en Firestore para {silo_id}: {e}")
+        return 0
 
 
 # ===========================================================================
@@ -408,6 +481,15 @@ async def ingest_sensor_reading(
 
     try:
         result = _ai_service.ingest_and_analyze(reading)
+
+        # Persistencia del análisis la hace ingest_and_analyze vía
+        # repo.save_result() (medición 'ai_analisis' en InfluxDB).
+        # Las alertas se reparten a Firestore si hay mapeo seguro a owner.
+        created_alerts = _notify_firestore_alerts(result.silo_id, result.alerts)
+        metadata = dict(result.metadata or {})
+        if created_alerts:
+            metadata["firestore_alerts_created"] = created_alerts
+
         return IngestResponse(
             status="ok",
             silo_id=result.silo_id,
@@ -417,7 +499,7 @@ async def ingest_sensor_reading(
             predictions=result.predictions,
             anomalies=result.anomalies,
             alerts=result.alerts,
-            metadata=result.metadata,
+            metadata=metadata,
         )
     except Exception as e:
         logger.error(f"Error en /ingest: {e}")
@@ -532,6 +614,89 @@ async def clear_chat_session(
 
 
 # ===========================================================================
+# DOCUMENTOS (RAG con embeddings locales de Ollama)
+# ===========================================================================
+
+
+def _rag():
+    """Índice RAG global o None si no se puede inicializar."""
+    try:
+        return get_rag_index()
+    except Exception as e:
+        logger.warning(f"RAG no disponible: {e}")
+        return None
+
+
+@router.post("/documents", response_model=DocumentUploadResponse, tags=["Documentos"])
+async def upload_document(
+    request: DocumentUploadRequest,
+    _user: dict = Depends(get_current_user),
+):
+    """
+    Indexa un documento de texto en el RAG local (chunk + embeddings Ollama).
+
+    Idempotente por (name, sha256 del contenido): el mismo documento no se
+    re-indexa; si cambia el contenido con el mismo nombre, se reemplaza.
+    """
+    rag = _rag()
+    if rag is None:
+        raise HTTPException(status_code=503, detail="RAG no disponible")
+
+    try:
+        info = await run_in_threadpool(rag.add_document, request.name, request.content)
+    except RAGUnavailable as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Servicio de embeddings no disponible: {e}",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    total = len(rag)
+    return DocumentUploadResponse(
+        status="ok",
+        document=DocumentInfo(**info),
+        total_chunks=total,
+    )
+
+
+@router.get("/documents", response_model=DocumentListResponse, tags=["Documentos"])
+async def list_documents(_user: dict = Depends(get_current_user)):
+    """Lista los documentos indexados con su cantidad de chunks y fecha."""
+    rag = _rag()
+    if rag is None:
+        raise HTTPException(status_code=503, detail="RAG no disponible")
+
+    docs = rag.list_documents()
+    return DocumentListResponse(
+        documents=[DocumentInfo(**d) for d in docs],
+        total=len(docs),
+        total_chunks=len(rag),
+    )
+
+
+@router.delete("/documents/{doc_id}", response_model=DocumentDeleteResponse, tags=["Documentos"])
+async def delete_document(
+    doc_id: str,
+    _user: dict = Depends(get_current_user),
+):
+    """Elimina un documento del índice RAG y repersiste el índice."""
+    rag = _rag()
+    if rag is None:
+        raise HTTPException(status_code=503, detail="RAG no disponible")
+
+    deleted = await run_in_threadpool(rag.delete_document, doc_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Documento no encontrado")
+
+    return DocumentDeleteResponse(
+        status="ok",
+        doc_id=doc_id,
+        remaining_chunks=len(rag),
+    )
+
+
+# ===========================================================================
 # FRONTEND DATA ENDPOINTS (silos overview, history, current)
 # ===========================================================================
 
@@ -565,6 +730,17 @@ async def get_silos_overview(user: dict = Depends(get_current_user)):
             if str(silo.get("silo_id")) in allowed
         ]
 
+    # Último análisis AI por silo (medición ai_analisis). Si la medición
+    # todavía no existe, devuelve {} y los campos quedan en None.
+    ai_overview: dict = {}
+    if _influx_repo is not None:
+        try:
+            ai_overview = await run_in_threadpool(
+                _influx_repo.get_latest_ai_analysis_per_silo, 24
+            )
+        except Exception as e:
+            logger.warning(f"ai_analisis no disponible para overview: {e}")
+
     silos = [
         SiloOverviewItem(
             silo_id=s["silo_id"],
@@ -584,6 +760,10 @@ async def get_silos_overview(user: dict = Depends(get_current_user)):
             gps_satellites=s.get("gps_satellites"),
             gps_hdop=s.get("gps_hdop"),
             gps_age_min=s.get("gps_age_min"),
+            ai_risk_score=(ai_overview.get(s["silo_id"]) or {}).get("ai_risk_score"),
+            ai_risk_level=(ai_overview.get(s["silo_id"]) or {}).get("ai_risk_level"),
+            ai_anomaly=(ai_overview.get(s["silo_id"]) or {}).get("ai_anomaly"),
+            ai_analysis_at=(ai_overview.get(s["silo_id"]) or {}).get("ai_analysis_at"),
         )
         for s in raw
     ]
@@ -643,6 +823,42 @@ async def get_silo_history(
         history=history,
         hours=hours,
         total_points=len(history),
+    )
+
+
+@router.get(
+    "/silos/{silo_id}/ai-analysis",
+    response_model=AIAnalysisResponse,
+    tags=["Datos"],
+)
+async def get_silo_ai_analysis(
+    silo_id: str,
+    hours: int = 24,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Análisis del pipeline AI persistido por /ingest (medición 'ai_analisis').
+
+    Devuelve el análisis más reciente y la serie de las últimas N horas
+    (default 24). Si el pipeline nunca corrió para ese silo, devuelve
+    latest=None y series=[].
+    """
+    if hours < 1 or hours > 720:
+        raise HTTPException(status_code=422, detail="hours debe estar entre 1 y 720")
+    require_silo_access(str(user["uid"]), silo_id)
+    if _influx_repo is None:
+        raise HTTPException(status_code=503, detail="InfluxDB no disponible")
+
+    series = await run_in_threadpool(
+        _influx_repo.get_result_history, silo_id, hours
+    )
+    points = [AIAnalysisPoint(**p) for p in series]
+    return AIAnalysisResponse(
+        silo_id=silo_id,
+        latest=points[0] if points else None,
+        series=points,
+        hours=hours,
+        total_points=len(points),
     )
 
 

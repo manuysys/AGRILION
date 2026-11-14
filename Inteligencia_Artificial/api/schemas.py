@@ -208,6 +208,11 @@ class SiloOverviewItem(BaseModel):
     gps_satellites: Optional[int] = None
     gps_hdop: Optional[float] = None
     gps_age_min: Optional[int] = None
+    # Último análisis del pipeline AI (medición InfluxDB 'ai_analisis')
+    ai_risk_score: Optional[int] = None
+    ai_risk_level: Optional[str] = None
+    ai_anomaly: Optional[bool] = None
+    ai_analysis_at: Optional[str] = None
 
 
 class SilosOverviewResponse(BaseModel):
@@ -232,3 +237,71 @@ class SiloHistoryResponse(BaseModel):
     history: List[SiloHistoryItem]
     hours: int
     total_points: int
+
+
+# =============================================================================
+# DOCUMENTOS / RAG SCHEMAS
+# =============================================================================
+
+
+class DocumentUploadRequest(BaseModel):
+    """Request para indexar un documento de texto en el RAG local."""
+    name: str = Field(..., min_length=1, max_length=256, description="Nombre único del documento")
+    content: str = Field(..., min_length=1, max_length=2_000_000, description="Contenido en texto plano")
+
+
+class DocumentInfo(BaseModel):
+    """Documento indexado en el RAG."""
+    doc_id: str
+    name: str
+    chunks: int
+    indexed_at: str = ""
+    sha256: str = ""
+
+
+class DocumentUploadResponse(BaseModel):
+    """Response del indexado de un documento."""
+    status: str = "ok"
+    document: DocumentInfo
+    total_chunks: int = 0
+
+
+class DocumentListResponse(BaseModel):
+    """Response del listado de documentos indexados."""
+    documents: List[DocumentInfo]
+    total: int
+    total_chunks: int
+
+
+class DocumentDeleteResponse(BaseModel):
+    """Response del borrado de un documento."""
+    status: str = "ok"
+    doc_id: str
+    remaining_chunks: int = 0
+
+
+# =============================================================================
+# AI ANALYSIS SCHEMAS (medición InfluxDB ai_analisis)
+# =============================================================================
+
+
+class AIAnalysisPoint(BaseModel):
+    """Un análisis del pipeline AI persistido en InfluxDB."""
+    timestamp: str
+    risk_score: Optional[float] = None
+    risk_level: Optional[str] = None
+    anomaly: Optional[bool] = None
+    affected_sensors: Optional[str] = None
+    pred_temp_1h: Optional[float] = None
+    pred_hum_1h: Optional[float] = None
+    pred_co2_1h: Optional[float] = None
+    engine: Optional[str] = None
+
+
+class AIAnalysisResponse(BaseModel):
+    """Response para /silos/{id}/ai-analysis."""
+    silo_id: str
+    latest: Optional[AIAnalysisPoint] = None
+    series: List[AIAnalysisPoint] = []
+    hours: int = 24
+    total_points: int = 0
