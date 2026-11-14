@@ -89,3 +89,10 @@ AI_API_stdout.log
 emulator_screen.png
 schematic.png
 silo-detail-e2e.png
+
+# Build Android (artefactos locales)
+AppCelular/build/
+AppCelular/.gradle/
+AppCelular/.kotlin/
+AppCelular/app/build/
+AppCelular/local.properties
